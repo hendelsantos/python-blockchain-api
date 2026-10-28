@@ -20,6 +20,8 @@ class BlockchainRepository(Protocol):
 
     def commit_mined_block(self, block: Block) -> None: ...
 
+    def replace_chain(self, blocks: list[Block]) -> None: ...
+
 
 class InMemoryBlockchainRepository:
     """Implementação rápida para testes unitários e usos efêmeros."""
@@ -42,4 +44,8 @@ class InMemoryBlockchainRepository:
 
     def commit_mined_block(self, block: Block) -> None:
         self._chain.append(block)
+        self._pending.clear()
+
+    def replace_chain(self, blocks: list[Block]) -> None:
+        self._chain = list(blocks)
         self._pending.clear()

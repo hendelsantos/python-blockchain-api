@@ -23,6 +23,7 @@
         <a href="#blockchain">Blockchain</a>
         <a href="#operations">Operações</a>
         <a href="#wallets">Carteiras</a>
+        <a href="#network">Rede</a>
         <a class="docs-link" href="/docs" target="_blank" rel="noreferrer">API Docs ↗</a>
       </nav>
     </header>
@@ -30,7 +31,7 @@
     <main>
       <section class="hero">
         <div class="hero-copy">
-          <div class="eyebrow"><span class="pulse"></span> REDE LOCAL ATIVA</div>
+          <div class="eyebrow"><span class="pulse"></span> <span id="realtime-status">CONECTANDO À REDE</span></div>
           <h1>Blockchain local,<br /><span>agora visível.</span></h1>
           <p>
             Crie transações, consulte saldos e acompanhe uma cadeia persistida
@@ -166,6 +167,42 @@
             <div id="wallet-list" class="wallet-list" aria-live="polite">
               <div class="empty-wallet">Nenhuma carteira minerou tokens ainda.</div>
             </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="network-section" id="network">
+        <div class="section-heading">
+          <div>
+            <span class="kicker">P2P NETWORK</span>
+            <h2>Nós e consenso</h2>
+          </div>
+          <p>Registre outros nós e adote automaticamente a cadeia válida mais longa.</p>
+        </div>
+        <div class="network-layout">
+          <article class="panel network-control">
+            <div class="panel-heading">
+              <span class="step purple">04</span>
+              <div><h3>Adicionar peer</h3><p>Informe a URL alcançável pelo servidor.</p></div>
+            </div>
+            <form id="peer-form">
+              <label>
+                URL do nó
+                <input name="url" type="url" placeholder="http://node2:8000" required />
+              </label>
+              <button class="button ghost wide" type="submit">Registrar peer</button>
+            </form>
+            <button id="resolve-consensus" class="button primary wide" type="button">Resolver consenso</button>
+          </article>
+          <article class="panel network-state">
+            <div class="network-node-heading">
+              <div><span class="kicker">NÓ ATUAL</span><h3 id="node-id">carregando…</h3></div>
+              <span id="peer-count" class="count-badge">0 peers</span>
+            </div>
+            <div id="peer-list" class="peer-list">
+              <div class="empty-wallet">Nenhum peer registrado.</div>
+            </div>
+            <div class="network-note"><span class="pulse"></span> Atualizações de blocos via WebSocket</div>
           </article>
         </div>
       </section>

@@ -25,3 +25,7 @@ class TransactionCreate(BaseModel):
 class MessageResponse(BaseModel):
     message: str
     data: dict[str, object]
+
+
+class PeerRegistration(BaseModel):
+    urls: list[str] = Field(min_length=1, max_length=20)

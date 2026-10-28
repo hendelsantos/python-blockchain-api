@@ -4,8 +4,8 @@ Uma blockchain educacional com **Python**, **FastAPI** e **proof-of-work**, cria
 projeto de portfólio backend. O projeto demonstra modelagem de domínio, API REST,
 concorrência básica, persistência SQL, testes automatizados, containerização e integração contínua.
 
-> Este projeto é educacional. As carteiras usam Ed25519, mas ainda não oferecem
-> recuperação de chave, consenso distribuído ou garantias para uso financeiro real.
+> Este projeto é educacional. As carteiras usam Ed25519 e os nós usam a regra da
+> cadeia válida mais longa, mas isso não constitui consenso seguro para uso financeiro real.
 
 ## O que já funciona
 
@@ -20,6 +20,9 @@ concorrência básica, persistência SQL, testes automatizados, containerizaçã
 - carteiras, consulta de saldo e bloqueio de gasto duplo pendente;
 - carteiras Ed25519 geradas no navegador e transações assinadas;
 - validação de assinatura, endereço e nonce contra ataques de replay;
+- registro de peers e consenso pela cadeia válida mais longa;
+- atualizações de blocos em tempo real por WebSocket;
+- segundo nó isolado e opcional no Docker Compose;
 - migrações de banco com Alembic;
 - testes unitários e de integração;
 - Docker e pipeline de CI no GitHub Actions.
@@ -53,6 +56,24 @@ Acesse:
 - ReDoc: http://localhost:8000/redoc
 
 Para usar outra porta, execute `API_PORT=8123 docker compose up --build`.
+
+### Executar uma rede com dois nós
+
+```bash
+docker compose --profile network up --build
+```
+
+O primeiro nó fica em `http://localhost:8000` e o segundo em
+`http://localhost:8002`, cada um com seu próprio PostgreSQL. Registre o segundo nó no
+primeiro usando `http://node2:8000`, que é o endereço interno do Docker:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/nodes/register \
+  -H "Content-Type: application/json" \
+  -d '{"urls":["http://node2:8000"]}'
+
+curl -X POST http://localhost:8000/api/v1/nodes/resolve
+```
 
 ## Como executar localmente com SQLite
 
@@ -109,6 +130,10 @@ curl http://localhost:8000/api/v1/wallets/alice/balance
 | `GET` | `/api/v1/wallets` | Lista carteiras e saldos |
 | `POST` | `/api/v1/wallets/generate` | Gera chaves Ed25519 para uso via API |
 | `GET` | `/api/v1/wallets/{address}/balance` | Consulta o saldo de uma carteira |
+| `GET` | `/api/v1/nodes` | Identidade e peers do nó |
+| `POST` | `/api/v1/nodes/register` | Registra novos peers |
+| `POST` | `/api/v1/nodes/resolve` | Executa o consenso entre peers |
+| `WS` | `/ws/blocks` | Eventos de blocos e transações em tempo real |
 
 ## Qualidade
 
@@ -133,8 +158,8 @@ src/blockchain_api/
 ## Próximas evoluções
 
 - importar, exportar e recuperar carteiras com segurança;
-- propagar blocos entre nós via WebSocket;
-- implementar consenso entre nós;
+- descoberta automática e autenticação entre peers;
+- consenso tolerante a falhas bizantinas;
 - autenticação, observabilidade e deploy em nuvem.
 
 ## Licença

@@ -146,3 +146,14 @@ def test_detects_a_tampered_chain() -> None:
     blockchain._chain[1] = replace(original, previous_hash="invalid")
 
     assert not blockchain.is_valid()
+
+
+def test_replaces_chain_only_when_candidate_is_valid_and_longer() -> None:
+    local = Blockchain(difficulty=1)
+    remote = Blockchain(difficulty=1)
+    remote.mine_pending_transactions("miner-a")
+    remote.mine_pending_transactions("miner-b")
+
+    assert local.replace_chain(list(remote.chain))
+    assert len(local.chain) == 3
+    assert not local.replace_chain(list(remote.chain))

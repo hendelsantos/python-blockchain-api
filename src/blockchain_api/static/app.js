@@ -19,6 +19,12 @@ const elements = {
   activeWallet: document.querySelector("#active-wallet"),
   senderInput: document.querySelector("#sender-input"),
   minerInput: document.querySelector("#miner-input"),
+  realtimeStatus: document.querySelector("#realtime-status"),
+  peerForm: document.querySelector("#peer-form"),
+  peerList: document.querySelector("#peer-list"),
+  peerCount: document.querySelector("#peer-count"),
+  nodeId: document.querySelector("#node-id"),
+  resolveConsensus: document.querySelector("#resolve-consensus"),
 };
 
 const SESSION_WALLETS_KEY = "chainlab.ed25519.wallets";
@@ -151,6 +157,39 @@ function renderWallets(wallets) {
       <span class="wallet-balance"><span>Confirmado</span><strong>${formatAmount(wallet.confirmed)}</strong></span>
       <span class="wallet-balance"><span>Disponível</span><strong>${formatAmount(wallet.available)}</strong></span>
     </div>`).join("");
+}
+
+function renderNetwork(network) {
+  elements.nodeId.textContent = network.node_id;
+  elements.nodeId.title = network.node_id;
+  elements.peerCount.textContent = `${network.peer_count} peer${network.peer_count === 1 ? "" : "s"}`;
+  elements.peerList.innerHTML = network.peers.length
+    ? network.peers.map((peer) => `<div class="peer-row">${escapeHtml(peer)}</div>`).join("")
+    : '<div class="empty-wallet">Nenhum peer registrado.</div>';
+}
+
+async function loadNetwork() {
+  try {
+    renderNetwork(await request(`${API}/nodes`));
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+function connectRealtime() {
+  const protocol = location.protocol === "https:" ? "wss" : "ws";
+  const socket = new WebSocket(`${protocol}://${location.host}/ws/blocks`);
+  socket.addEventListener("open", () => {
+    elements.realtimeStatus.textContent = "REDE EM TEMPO REAL";
+  });
+  socket.addEventListener("message", () => {
+    loadDashboard({ silent: true });
+    loadNetwork();
+  });
+  socket.addEventListener("close", () => {
+    elements.realtimeStatus.textContent = "RECONECTANDO À REDE";
+    window.setTimeout(connectRealtime, 2000);
+  });
 }
 
 function renderChain(chain) {
@@ -300,7 +339,42 @@ elements.walletForm.addEventListener("submit", async (event) => {
   }
 });
 
+elements.peerForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const url = new FormData(form).get("url");
+  try {
+    await request(`${API}/nodes/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ urls: [url] }),
+    });
+    form.reset();
+    await loadNetwork();
+    showToast("Peer registrado no nó atual.");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
+elements.resolveConsensus.addEventListener("click", async () => {
+  elements.resolveConsensus.disabled = true;
+  try {
+    const result = await request(`${API}/nodes/resolve`, { method: "POST" });
+    await loadDashboard({ silent: true });
+    showToast(result.replaced
+      ? `Cadeia substituída pela cópia de ${result.source}.`
+      : "A cadeia local já é a melhor disponível.");
+  } catch (error) {
+    showToast(error.message, "error");
+  } finally {
+    elements.resolveConsensus.disabled = false;
+  }
+});
+
 loadDashboard({ silent: true });
+loadNetwork();
+connectRealtime();
 
 const restoredWallets = Object.values(getSessionWallets());
 if (restoredWallets.length) activateWallet(restoredWallets.at(-1));

@@ -122,3 +122,31 @@ def test_generates_cryptographic_wallet() -> None:
     assert len(response.json()["address"]) == 40
     assert response.json()["public_key"]
     assert response.json()["private_key"]
+
+
+def test_registers_nodes_and_reports_status() -> None:
+    client = make_client()
+
+    register = client.post(
+        "/api/v1/nodes/register",
+        json={"urls": ["http://node2:8000/"]},
+    )
+    status = client.get("/api/v1/nodes")
+
+    assert register.status_code == 200
+    assert status.json()["node_id"]
+    assert status.json()["peers"] == ["http://node2:8000"]
+
+
+def test_websocket_receives_new_block_event() -> None:
+    client = make_client()
+
+    with client.websocket_connect("/ws/blocks") as websocket:
+        snapshot = websocket.receive_json()
+        response = client.post("/api/v1/mine/realtime-miner")
+        event = websocket.receive_json()
+
+    assert snapshot == {"type": "chain_snapshot", "length": 1, "valid": True}
+    assert response.status_code == 200
+    assert event["type"] == "block_mined"
+    assert event["block"]["index"] == 1

@@ -4,13 +4,15 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from blockchain_api.api.schemas import MessageResponse, TransactionCreate
+from blockchain_api.api.realtime import RealtimeManager
+from blockchain_api.api.schemas import MessageResponse, PeerRegistration, TransactionCreate
 from blockchain_api.core.blockchain import (
     Blockchain,
     InsufficientFundsError,
     InvalidTransactionError,
 )
 from blockchain_api.core.crypto import generate_wallet
+from blockchain_api.core.network import NodeManager
 
 router = APIRouter(prefix="/api/v1")
 
@@ -20,6 +22,18 @@ def get_blockchain(request: Request) -> Blockchain:
 
 
 BlockchainDependency = Annotated[Blockchain, Depends(get_blockchain)]
+
+
+def get_node_manager(request: Request) -> NodeManager:
+    return request.app.state.node_manager
+
+
+def get_realtime_manager(request: Request) -> RealtimeManager:
+    return request.app.state.realtime
+
+
+NodeManagerDependency = Annotated[NodeManager, Depends(get_node_manager)]
+RealtimeDependency = Annotated[RealtimeManager, Depends(get_realtime_manager)]
 
 
 def serialize_wallet(wallet: dict[str, object]) -> dict[str, object]:
@@ -57,9 +71,10 @@ def get_pending_transactions(
     status_code=status.HTTP_201_CREATED,
     summary="Adiciona uma transação ao próximo bloco",
 )
-def create_transaction(
+async def create_transaction(
     payload: TransactionCreate,
     blockchain: BlockchainDependency,
+    realtime: RealtimeDependency,
 ) -> MessageResponse:
     try:
         transaction = blockchain.add_transaction(
@@ -78,13 +93,16 @@ def create_transaction(
             detail=str(exc),
         ) from exc
 
-    return MessageResponse(message="Transação adicionada", data=transaction.to_dict())
+    data = transaction.to_dict()
+    await realtime.broadcast({"type": "pending_transaction", "data": data})
+    return MessageResponse(message="Transação adicionada", data=data)
 
 
 @router.post("/mine/{miner}", summary="Minera as transações pendentes")
-def mine_block(
+async def mine_block(
     miner: str,
     blockchain: BlockchainDependency,
+    realtime: RealtimeDependency,
 ) -> dict[str, object]:
     try:
         block = blockchain.mine_pending_transactions(miner)
@@ -93,7 +111,9 @@ def mine_block(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc
-    return {"message": "Bloco minerado", "block": block.to_dict()}
+    data = block.to_dict()
+    await realtime.broadcast({"type": "block_mined", "block": data})
+    return {"message": "Bloco minerado", "block": data}
 
 
 @router.get("/wallets", summary="Lista carteiras e saldos conhecidos")
@@ -121,3 +141,43 @@ def get_wallet_balance(address: str, blockchain: BlockchainDependency) -> dict[s
             detail=str(exc),
         ) from exc
     return serialize_wallet({"address": address, **balance})
+
+
+@router.get("/nodes", summary="Retorna a identidade e os peers do nó")
+def get_nodes(
+    nodes: NodeManagerDependency,
+    realtime: RealtimeDependency,
+) -> dict[str, object]:
+    return {
+        "node_id": nodes.node_id,
+        "peers": nodes.peers,
+        "peer_count": len(nodes.peers),
+        "websocket_clients": realtime.connection_count,
+    }
+
+
+@router.post("/nodes/register", summary="Registra peers HTTP")
+def register_nodes(
+    payload: PeerRegistration,
+    nodes: NodeManagerDependency,
+) -> dict[str, object]:
+    try:
+        peers = nodes.register(payload.urls)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    return {"message": "Peers registrados", "peers": peers, "count": len(peers)}
+
+
+@router.post("/nodes/resolve", summary="Executa o consenso da cadeia válida mais longa")
+async def resolve_nodes(
+    blockchain: BlockchainDependency,
+    nodes: NodeManagerDependency,
+    realtime: RealtimeDependency,
+) -> dict[str, object]:
+    result = await nodes.resolve_conflicts(blockchain)
+    if result["replaced"]:
+        await realtime.broadcast({"type": "chain_replaced", **result})
+    return result

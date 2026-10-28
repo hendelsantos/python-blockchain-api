@@ -227,47 +227,67 @@ class Blockchain:
             candidate = replace(candidate, nonce=candidate.nonce + 1)
         return candidate
 
+    def validate_chain(self, blocks: list[Block] | tuple[Block, ...]) -> bool:
+        if not blocks:
+            return False
+        if blocks[0].calculate_hash() != self._create_genesis_block().calculate_hash():
+            return False
+
+        for position, current in enumerate(blocks[1:], start=1):
+            previous = blocks[position - 1]
+            if current.index != position:
+                return False
+            if current.previous_hash != previous.calculate_hash():
+                return False
+            if not current.calculate_hash().startswith("0" * self.difficulty):
+                return False
+
+        expected_nonces: dict[str, int] = {}
+        for block in blocks:
+            for transaction in block.transactions:
+                if transaction.sender == "NETWORK":
+                    continue
+                expected = expected_nonces.get(transaction.sender, 0)
+                cryptographic_fields = (
+                    transaction.nonce,
+                    transaction.public_key,
+                    transaction.signature,
+                )
+                if all(value is None for value in cryptographic_fields):
+                    expected_nonces[transaction.sender] = expected + 1
+                    continue
+                if any(value is None for value in cryptographic_fields):
+                    return False
+                if transaction.nonce != expected:
+                    return False
+                try:
+                    if address_from_public_key(transaction.public_key) != transaction.sender:
+                        return False
+                except (ValueError, TypeError):
+                    return False
+                if not verify_transaction_signature(
+                    public_key=transaction.public_key,
+                    signature=transaction.signature,
+                    sender=transaction.sender,
+                    recipient=transaction.recipient,
+                    amount=transaction.amount,
+                    nonce=transaction.nonce,
+                ):
+                    return False
+                expected_nonces[transaction.sender] = expected + 1
+        return True
+
     def is_valid(self) -> bool:
         with self._lock:
-            for position, current in enumerate(self._chain[1:], start=1):
-                previous = self._chain[position - 1]
-                if current.index != position:
-                    return False
-                if current.previous_hash != previous.calculate_hash():
-                    return False
-                if not current.calculate_hash().startswith("0" * self.difficulty):
-                    return False
-            expected_nonces: dict[str, int] = {}
-            for block in self._chain:
-                for transaction in block.transactions:
-                    if transaction.sender == "NETWORK":
-                        continue
-                    expected = expected_nonces.get(transaction.sender, 0)
-                    cryptographic_fields = (
-                        transaction.nonce,
-                        transaction.public_key,
-                        transaction.signature,
-                    )
-                    if all(value is None for value in cryptographic_fields):
-                        expected_nonces[transaction.sender] = expected + 1
-                        continue
-                    if any(value is None for value in cryptographic_fields):
-                        return False
-                    if transaction.nonce != expected:
-                        return False
-                    try:
-                        if address_from_public_key(transaction.public_key) != transaction.sender:
-                            return False
-                    except (ValueError, TypeError):
-                        return False
-                    if not verify_transaction_signature(
-                        public_key=transaction.public_key,
-                        signature=transaction.signature,
-                        sender=transaction.sender,
-                        recipient=transaction.recipient,
-                        amount=transaction.amount,
-                        nonce=transaction.nonce,
-                    ):
-                        return False
-                    expected_nonces[transaction.sender] = expected + 1
+            return self.validate_chain(self._chain)
+
+    def replace_chain(self, blocks: list[Block]) -> bool:
+        """Adota uma cadeia válida mais longa e limpa transações pendentes."""
+
+        with self._lock:
+            if len(blocks) <= len(self._chain) or not self.validate_chain(blocks):
+                return False
+            self._repository.replace_chain(blocks)
+            self._chain = list(blocks)
+            self._pending_transactions.clear()
             return True

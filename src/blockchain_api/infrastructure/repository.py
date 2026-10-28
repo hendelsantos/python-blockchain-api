@@ -131,3 +131,11 @@ class SQLAlchemyBlockchainRepository:
         with self._session_factory.begin() as session:
             session.add(self._to_record(block))
             session.execute(delete(PendingTransactionRecord))
+
+    def replace_chain(self, blocks: list[Block]) -> None:
+        """Substitui a cadeia de forma atômica após validação pelo domínio."""
+
+        with self._session_factory.begin() as session:
+            session.execute(delete(PendingTransactionRecord))
+            session.execute(delete(BlockRecord))
+            session.add_all(self._to_record(block) for block in blocks)

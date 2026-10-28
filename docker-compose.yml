@@ -17,6 +17,7 @@ services:
     build: .
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-blockchain}:${POSTGRES_PASSWORD:-blockchain-dev}@db:5432/${POSTGRES_DB:-blockchain}
+      NODE_ID: node-1
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -26,5 +27,36 @@ services:
       sh -c "alembic upgrade head &&
       uvicorn blockchain_api.main:app --host 0.0.0.0 --port 8000"
 
+  db2:
+    image: postgres:17-alpine
+    profiles: ["network"]
+    environment:
+      POSTGRES_DB: blockchain_node2
+      POSTGRES_USER: blockchain
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-blockchain-dev}
+    volumes:
+      - postgres_node2_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blockchain -d blockchain_node2"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  node2:
+    build: .
+    profiles: ["network"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://blockchain:${POSTGRES_PASSWORD:-blockchain-dev}@db2:5432/blockchain_node2
+      NODE_ID: node-2
+    ports:
+      - "${NODE2_PORT:-8002}:8000"
+    depends_on:
+      db2:
+        condition: service_healthy
+    command: >-
+      sh -c "alembic upgrade head &&
+      uvicorn blockchain_api.main:app --host 0.0.0.0 --port 8000"
+
 volumes:
   postgres_data:
+  postgres_node2_data:

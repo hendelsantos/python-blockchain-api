@@ -116,7 +116,7 @@ h1 span { color: transparent; background: linear-gradient(90deg, var(--cyan), #7
 .stat-card div span { color: var(--muted); font-size: .76rem; }
 .stat-card strong { margin-top: 1px; overflow: hidden; font-size: 1.3rem; text-overflow: ellipsis; white-space: nowrap; }
 
-.operations, .blockchain-section { padding: 18px 0 100px; }
+.operations, .wallets-section, .blockchain-section { padding: 18px 0 100px; }
 .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 30px; margin-bottom: 28px; }
 .section-heading h2 { margin: 5px 0 0; font-size: 2rem; letter-spacing: -.035em; }
 .section-heading > p { max-width: 400px; margin: 0; color: var(--muted); font-size: .9rem; text-align: right; }
@@ -136,6 +136,21 @@ input::placeholder { color: #50677a; }
 .mining-info { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; padding: 14px; border: 1px solid rgba(138,92,255,.14); border-radius: 9px; background: rgba(138,92,255,.055); }
 .mining-info span { color: var(--muted); font-size: .67rem; letter-spacing: .12em; }.mining-info strong { color: #b9a5ff; }
 .pickaxe { font-size: .8rem; }
+.helper { margin: 10px 0 0; color: #657f92; font-size: .7rem; }
+
+.wallet-layout { display: grid; grid-template-columns: .78fr 1.22fr; gap: 18px; }
+.wallet-search-panel { display: flex; flex-direction: column; }
+.wallet-result { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 18px; }
+.balance-item { padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: rgba(3,11,18,.35); }
+.balance-item span { display: block; color: var(--muted); font-size: .65rem; letter-spacing: .06em; text-transform: uppercase; }
+.balance-item strong { display: block; margin-top: 4px; overflow: hidden; color: var(--cyan); font-family: ui-monospace, monospace; font-size: 1rem; text-overflow: ellipsis; }
+.wallet-list-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.wallet-list-heading h3 { margin: 4px 0 0; }.count-badge { display: grid; place-items: center; min-width: 32px; height: 32px; padding: 0 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-family: ui-monospace, monospace; }
+.wallet-list { display: grid; gap: 8px; max-height: 315px; overflow-y: auto; padding-right: 4px; }
+.wallet-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 9px; background: rgba(3,11,18,.28); }
+.wallet-address { min-width: 0; overflow: hidden; color: #c4d6e3; font-family: ui-monospace, monospace; font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
+.wallet-balance { text-align: right; }.wallet-balance span { display: block; color: var(--muted); font-size: .61rem; text-transform: uppercase; }.wallet-balance strong { color: var(--green); font-family: ui-monospace, monospace; font-size: .83rem; }
+.empty-wallet { padding: 18px; color: var(--muted); font-size: .78rem; text-align: center; }
 
 .chain-heading { align-items: center; }
 .legend { color: var(--muted); font-size: .78rem; }.legend span { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
@@ -159,6 +174,7 @@ footer { display: flex; justify-content: space-between; width: min(1180px, calc(
   .hero-visual { min-height: 340px; }
   .stats { grid-template-columns: 1fr 1fr; }
   .operation-grid { grid-template-columns: 1fr; }
+  .wallet-layout { grid-template-columns: 1fr; }
   .block-card { grid-template-columns: 80px 1fr; }.block-meta { grid-column: 2; align-items: start; }
 }
 
@@ -171,6 +187,7 @@ footer { display: flex; justify-content: space-between; width: min(1180px, calc(
   .stats { grid-template-columns: 1fr; margin-top: 55px; margin-bottom: 75px; }
   .section-heading { align-items: start; flex-direction: column; }.section-heading > p { text-align: left; }
   .panel { padding: 21px; }.field-row { align-items: stretch; flex-direction: column; }.arrow { display: none; }
+  .wallet-result { grid-template-columns: 1fr; }.wallet-row { grid-template-columns: 1fr auto; }.wallet-row .wallet-balance:last-child { display: none; }
   .block-card { grid-template-columns: 1fr; }.block-meta { grid-column: 1; align-items: start; }.hash-row span { flex-basis: 64px; }
   .legend { display: none; }
   footer { flex-direction: column; gap: 8px; }

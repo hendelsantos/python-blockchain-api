@@ -22,6 +22,7 @@
       <nav>
         <a href="#blockchain">Blockchain</a>
         <a href="#operations">Operações</a>
+        <a href="#wallets">Carteiras</a>
         <a class="docs-link" href="/docs" target="_blank" rel="noreferrer">API Docs ↗</a>
       </nav>
     </header>
@@ -32,7 +33,7 @@
           <div class="eyebrow"><span class="pulse"></span> REDE LOCAL ATIVA</div>
           <h1>Blockchain local,<br /><span>agora visível.</span></h1>
           <p>
-            Crie transações, minere novos blocos e acompanhe a integridade da cadeia
+            Crie transações, consulte saldos e acompanhe uma cadeia persistida
             em tempo real — tudo em uma interface simples.
           </p>
           <div class="hero-actions">
@@ -103,8 +104,9 @@
               </div>
               <label>
                 Valor
-                <div class="amount-input"><span>◈</span><input name="amount" type="number" min="0.00000001" step="0.00000001" placeholder="10.50" required /></div>
+                <div class="amount-input"><span>◈</span><input name="amount" type="number" min="0.00000001" step="0.00000001" placeholder="0.50" required /></div>
               </label>
+              <p class="helper">O remetente precisa ter saldo confirmado. Minere primeiro para receber tokens.</p>
               <button class="button primary wide" type="submit">Adicionar ao próximo bloco <span>→</span></button>
             </form>
           </article>
@@ -125,6 +127,41 @@
               </div>
               <button class="button mine wide" type="submit"><span class="pickaxe">◆</span> Iniciar mineração</button>
             </form>
+          </article>
+        </div>
+      </section>
+
+      <section class="wallets-section" id="wallets">
+        <div class="section-heading">
+          <div>
+            <span class="kicker">CARTEIRAS</span>
+            <h2>Saldos da rede</h2>
+          </div>
+          <p>Os saldos são derivados do histórico confirmado e descontam saídas pendentes.</p>
+        </div>
+        <div class="wallet-layout">
+          <article class="panel wallet-search-panel">
+            <div class="panel-heading">
+              <span class="step">03</span>
+              <div><h3>Consultar carteira</h3><p>Busque um endereço conhecido ou novo.</p></div>
+            </div>
+            <form id="wallet-form">
+              <label>
+                Endereço
+                <input name="address" placeholder="alice" maxlength="100" required />
+              </label>
+              <button class="button ghost wide" type="submit">Consultar saldo</button>
+            </form>
+            <div id="wallet-result" class="wallet-result empty-wallet">Informe um endereço para consultar.</div>
+          </article>
+          <article class="panel wallet-list-panel">
+            <div class="wallet-list-heading">
+              <div><span class="kicker">ATIVIDADE</span><h3>Carteiras conhecidas</h3></div>
+              <span id="wallet-count" class="count-badge">0</span>
+            </div>
+            <div id="wallet-list" class="wallet-list" aria-live="polite">
+              <div class="empty-wallet">Nenhuma carteira minerou tokens ainda.</div>
+            </div>
           </article>
         </div>
       </section>

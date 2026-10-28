@@ -9,11 +9,17 @@ from fastapi.staticfiles import StaticFiles
 from blockchain_api import __version__
 from blockchain_api.api.routes import router
 from blockchain_api.core.blockchain import Blockchain
+from blockchain_api.core.repository import BlockchainRepository
+from blockchain_api.infrastructure.database import build_repository
 
 STATIC_DIR = Path(__file__).parent / "static"
 
 
-def create_app(*, difficulty: int = 3) -> FastAPI:
+def create_app(
+    *,
+    difficulty: int = 3,
+    repository: BlockchainRepository | None = None,
+) -> FastAPI:
     application = FastAPI(
         title="Python Blockchain API",
         description="Blockchain educacional com proof-of-work e API REST.",
@@ -21,7 +27,7 @@ def create_app(*, difficulty: int = 3) -> FastAPI:
         contact={"name": "Hendel Santos"},
         license_info={"name": "MIT"},
     )
-    application.state.blockchain = Blockchain(difficulty=difficulty)
+    application.state.blockchain = Blockchain(difficulty=difficulty, repository=repository)
     application.include_router(router)
     application.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
@@ -36,4 +42,4 @@ def create_app(*, difficulty: int = 3) -> FastAPI:
     return application
 
 
-app = create_app()
+app = create_app(repository=build_repository())

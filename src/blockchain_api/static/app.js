@@ -11,6 +11,10 @@ const elements = {
   miningForm: document.querySelector("#mining-form"),
   refreshButton: document.querySelector("#refresh-button"),
   toast: document.querySelector("#toast"),
+  walletForm: document.querySelector("#wallet-form"),
+  walletResult: document.querySelector("#wallet-result"),
+  walletList: document.querySelector("#wallet-list"),
+  walletCount: document.querySelector("#wallet-count"),
 };
 
 function escapeHtml(value) {
@@ -55,6 +59,35 @@ function formatTimestamp(value) {
   }).format(new Date(value));
 }
 
+function formatAmount(value) {
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 8,
+  }).format(Number(value));
+}
+
+function renderWalletBalance(wallet) {
+  elements.walletResult.classList.remove("empty-wallet");
+  elements.walletResult.innerHTML = `
+    <div class="balance-item"><span>Confirmado</span><strong>${formatAmount(wallet.confirmed)}</strong></div>
+    <div class="balance-item"><span>Disponível</span><strong>${formatAmount(wallet.available)}</strong></div>
+    <div class="balance-item"><span>Saída pendente</span><strong>${formatAmount(wallet.pending_outgoing)}</strong></div>`;
+}
+
+function renderWallets(wallets) {
+  elements.walletCount.textContent = wallets.length;
+  if (!wallets.length) {
+    elements.walletList.innerHTML = '<div class="empty-wallet">Nenhuma carteira minerou tokens ainda.</div>';
+    return;
+  }
+  elements.walletList.innerHTML = wallets.map((wallet) => `
+    <div class="wallet-row">
+      <span class="wallet-address" title="${escapeHtml(wallet.address)}">${escapeHtml(wallet.address)}</span>
+      <span class="wallet-balance"><span>Confirmado</span><strong>${formatAmount(wallet.confirmed)}</strong></span>
+      <span class="wallet-balance"><span>Disponível</span><strong>${formatAmount(wallet.available)}</strong></span>
+    </div>`).join("");
+}
+
 function renderChain(chain) {
   if (!chain.length) {
     elements.chain.innerHTML = '<div class="empty-state">Nenhum bloco encontrado.</div>';
@@ -89,10 +122,11 @@ function renderChain(chain) {
 async function loadDashboard({ silent = false } = {}) {
   elements.refreshButton.disabled = true;
   try {
-    const [chainData, pendingData, validationData] = await Promise.all([
+    const [chainData, pendingData, validationData, walletData] = await Promise.all([
       request(`${API}/chain`),
       request(`${API}/transactions/pending`),
       request(`${API}/chain/validate`),
+      request(`${API}/wallets`),
     ]);
     const lastBlock = chainData.chain.at(-1);
     elements.blocks.textContent = chainData.length;
@@ -102,6 +136,7 @@ async function loadDashboard({ silent = false } = {}) {
     elements.nonce.textContent = lastBlock?.nonce?.toLocaleString("pt-BR") ?? "—";
     elements.heroBlock.textContent = `#${String(lastBlock?.index ?? 0).padStart(3, "0")}`;
     renderChain(chainData.chain);
+    renderWallets(walletData.wallets);
     if (!silent) showToast("Dados da blockchain atualizados.");
   } catch (error) {
     elements.chain.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
@@ -157,4 +192,16 @@ elements.miningForm.addEventListener("submit", async (event) => {
 });
 
 elements.refreshButton.addEventListener("click", () => loadDashboard());
+
+elements.walletForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const address = new FormData(event.currentTarget).get("address");
+  try {
+    const wallet = await request(`${API}/wallets/${encodeURIComponent(address)}/balance`);
+    renderWalletBalance(wallet);
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+
 loadDashboard({ silent: true });

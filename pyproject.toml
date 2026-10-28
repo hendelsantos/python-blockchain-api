@@ -4,14 +4,17 @@ build-backend = "hatchling.build"
 
 [project]
 name = "python-blockchain-api"
-version = "0.2.0"
+version = "0.3.0"
 description = "API REST educacional de uma blockchain construída com Python e FastAPI."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Hendel Santos" }]
 dependencies = [
+  "alembic>=1.14,<2.0",
   "fastapi>=0.115,<1.0",
+  "psycopg[binary]>=3.2,<4.0",
+  "sqlalchemy>=2.0,<3.0",
   "uvicorn[standard]>=0.32,<1.0",
 ]
 

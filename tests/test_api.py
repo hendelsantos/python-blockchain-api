@@ -29,9 +29,12 @@ def test_dashboard_and_static_assets_are_served() -> None:
 def test_transaction_mining_flow() -> None:
     client = make_client()
 
+    reward_response = client.post("/api/v1/mine/alice")
+    assert reward_response.status_code == 200
+
     transaction_response = client.post(
         "/api/v1/transactions",
-        json={"sender": "alice", "recipient": "bob", "amount": "12.50"},
+        json={"sender": "alice", "recipient": "bob", "amount": "0.50"},
     )
     assert transaction_response.status_code == 201
 
@@ -41,10 +44,23 @@ def test_transaction_mining_flow() -> None:
 
     chain_response = client.get("/api/v1/chain")
     assert chain_response.status_code == 200
-    assert chain_response.json()["length"] == 2
+    assert chain_response.json()["length"] == 3
 
     validation_response = client.get("/api/v1/chain/validate")
     assert validation_response.json() == {"valid": True}
+
+    wallet_response = client.get("/api/v1/wallets/alice/balance")
+    assert wallet_response.status_code == 200
+    assert wallet_response.json()["confirmed"] == "0.50"
+
+
+def test_rejects_transaction_with_insufficient_funds() -> None:
+    response = make_client().post(
+        "/api/v1/transactions",
+        json={"sender": "alice", "recipient": "bob", "amount": "1"},
+    )
+
+    assert response.status_code == 409
 
 
 def test_rejects_same_sender_and_recipient() -> None:

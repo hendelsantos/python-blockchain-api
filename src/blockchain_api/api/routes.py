@@ -5,7 +5,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from blockchain_api.api.schemas import MessageResponse, TransactionCreate
-from blockchain_api.core.blockchain import Blockchain, InvalidTransactionError
+from blockchain_api.core.blockchain import (
+    Blockchain,
+    InsufficientFundsError,
+    InvalidTransactionError,
+)
 
 router = APIRouter(prefix="/api/v1")
 
@@ -15,6 +19,13 @@ def get_blockchain(request: Request) -> Blockchain:
 
 
 BlockchainDependency = Annotated[Blockchain, Depends(get_blockchain)]
+
+
+def serialize_wallet(wallet: dict[str, object]) -> dict[str, object]:
+    return {
+        key: str(value) if key in {"confirmed", "available", "pending_outgoing"} else value
+        for key, value in wallet.items()
+    }
 
 
 @router.get("/chain", summary="Retorna todos os blocos")
@@ -55,6 +66,8 @@ def create_transaction(
             recipient=payload.recipient,
             amount=payload.amount,
         )
+    except InsufficientFundsError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except InvalidTransactionError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -77,3 +90,21 @@ def mine_block(
             detail=str(exc),
         ) from exc
     return {"message": "Bloco minerado", "block": block.to_dict()}
+
+
+@router.get("/wallets", summary="Lista carteiras e saldos conhecidos")
+def list_wallets(blockchain: BlockchainDependency) -> dict[str, object]:
+    wallets = blockchain.list_wallets()
+    return {"count": len(wallets), "wallets": [serialize_wallet(wallet) for wallet in wallets]}
+
+
+@router.get("/wallets/{address}/balance", summary="Consulta o saldo de uma carteira")
+def get_wallet_balance(address: str, blockchain: BlockchainDependency) -> dict[str, object]:
+    try:
+        balance = blockchain.get_balance(address)
+    except InvalidTransactionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+    return serialize_wallet({"address": address, **balance})

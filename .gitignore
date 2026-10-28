@@ -8,6 +8,8 @@ htmlcov/
 .venv/
 venv/
 .env
+*.db
+.alembic-version
 .idea/
 .vscode/
 dist/

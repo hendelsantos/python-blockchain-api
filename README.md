@@ -15,6 +15,7 @@ concorrência básica, testes automatizados, containerização e integração co
 - recompensa para o minerador;
 - encadeamento por SHA-256 e validação de integridade;
 - API documentada automaticamente com OpenAPI/Swagger;
+- dashboard web responsivo para visualizar e operar a blockchain;
 - testes unitários e de integração;
 - Docker e pipeline de CI no GitHub Actions.
 
@@ -39,7 +40,7 @@ uvicorn blockchain_api.main:app --reload
 
 Acesse:
 
-- API: http://localhost:8000
+- Dashboard: http://localhost:8000
 - Swagger: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 

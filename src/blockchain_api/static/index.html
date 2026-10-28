@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Painel visual da Python Blockchain API" />
+    <title>ChainLab — Blockchain Dashboard</title>
+    <link rel="stylesheet" href="/static/app.css" />
+    <script src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="ChainLab, página inicial">
+        <span class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </span>
+        <span>CHAIN<span class="accent">LAB</span></span>
+      </a>
+      <nav>
+        <a href="#blockchain">Blockchain</a>
+        <a href="#operations">Operações</a>
+        <a class="docs-link" href="/docs" target="_blank" rel="noreferrer">API Docs ↗</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="pulse"></span> REDE LOCAL ATIVA</div>
+          <h1>Blockchain local,<br /><span>agora visível.</span></h1>
+          <p>
+            Crie transações, minere novos blocos e acompanhe a integridade da cadeia
+            em tempo real — tudo em uma interface simples.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#operations">Criar transação</a>
+            <button class="button ghost" id="refresh-button" type="button">↻ Atualizar dados</button>
+          </div>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="orbit orbit-large"></div>
+          <div class="orbit orbit-small"></div>
+          <div class="cube cube-back"><span>00A</span></div>
+          <div class="cube cube-main">
+            <div class="cube-icon">#</div>
+            <strong>BLOCK</strong>
+            <span id="hero-block-number">#000</span>
+          </div>
+          <div class="node node-one"></div>
+          <div class="node node-two"></div>
+          <div class="node node-three"></div>
+        </div>
+      </section>
+
+      <section class="stats" aria-label="Resumo da blockchain">
+        <article class="stat-card">
+          <span class="stat-icon blue">▦</span>
+          <div><span>Blocos na cadeia</span><strong id="stat-blocks">—</strong></div>
+        </article>
+        <article class="stat-card">
+          <span class="stat-icon violet">⇄</span>
+          <div><span>Transações pendentes</span><strong id="stat-pending">—</strong></div>
+        </article>
+        <article class="stat-card">
+          <span class="stat-icon green">✓</span>
+          <div><span>Integridade</span><strong id="stat-valid">Verificando</strong></div>
+        </article>
+        <article class="stat-card">
+          <span class="stat-icon amber">◇</span>
+          <div><span>Último nonce</span><strong id="stat-nonce">—</strong></div>
+        </article>
+      </section>
+
+      <section class="operations" id="operations">
+        <div class="section-heading">
+          <div>
+            <span class="kicker">LABORATÓRIO</span>
+            <h2>Operações da rede</h2>
+          </div>
+          <p>Adicione dados ao próximo bloco ou execute o proof-of-work.</p>
+        </div>
+
+        <div class="operation-grid">
+          <article class="panel form-panel">
+            <div class="panel-heading">
+              <span class="step">01</span>
+              <div><h3>Nova transação</h3><p>Envie valor entre dois participantes.</p></div>
+            </div>
+            <form id="transaction-form">
+              <div class="field-row">
+                <label>
+                  Remetente
+                  <input name="sender" placeholder="alice" maxlength="100" required />
+                </label>
+                <span class="arrow" aria-hidden="true">→</span>
+                <label>
+                  Destinatário
+                  <input name="recipient" placeholder="bob" maxlength="100" required />
+                </label>
+              </div>
+              <label>
+                Valor
+                <div class="amount-input"><span>◈</span><input name="amount" type="number" min="0.00000001" step="0.00000001" placeholder="10.50" required /></div>
+              </label>
+              <button class="button primary wide" type="submit">Adicionar ao próximo bloco <span>→</span></button>
+            </form>
+          </article>
+
+          <article class="panel form-panel mining-panel">
+            <div class="panel-heading">
+              <span class="step purple">02</span>
+              <div><h3>Minerar bloco</h3><p>Confirme as transações pendentes.</p></div>
+            </div>
+            <form id="mining-form">
+              <label>
+                Identificador do minerador
+                <input name="miner" placeholder="miner-01" maxlength="100" required />
+              </label>
+              <div class="mining-info">
+                <span>RECOMPENSA DA REDE</span>
+                <strong>1 token</strong>
+              </div>
+              <button class="button mine wide" type="submit"><span class="pickaxe">◆</span> Iniciar mineração</button>
+            </form>
+          </article>
+        </div>
+      </section>
+
+      <section class="blockchain-section" id="blockchain">
+        <div class="section-heading chain-heading">
+          <div>
+            <span class="kicker">LEDGER</span>
+            <h2>Explorador de blocos</h2>
+          </div>
+          <div class="legend"><span></span> Cadeia verificada por SHA-256</div>
+        </div>
+        <div id="chain-container" class="chain-container" aria-live="polite">
+          <div class="empty-state">Carregando blockchain…</div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>ChainLab · Python Blockchain API</span>
+      <span>Projeto educacional · FastAPI + SHA-256</span>
+    </footer>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

@@ -14,6 +14,18 @@ def test_health_check() -> None:
     assert response.json()["status"] == "ok"
 
 
+def test_dashboard_and_static_assets_are_served() -> None:
+    client = make_client()
+
+    dashboard = client.get("/")
+    stylesheet = client.get("/static/app.css")
+
+    assert dashboard.status_code == 200
+    assert "ChainLab" in dashboard.text
+    assert stylesheet.status_code == 200
+    assert "--cyan" in stylesheet.text
+
+
 def test_transaction_mining_flow() -> None:
     client = make_client()
 

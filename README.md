@@ -4,8 +4,8 @@ Uma blockchain educacional com **Python**, **FastAPI** e **proof-of-work**, cria
 projeto de portfólio backend. O projeto demonstra modelagem de domínio, API REST,
 concorrência básica, persistência SQL, testes automatizados, containerização e integração contínua.
 
-> Este projeto é educacional. As carteiras são identificadores textuais e ainda não
-> possuem chaves criptográficas ou garantias necessárias para uso financeiro real.
+> Este projeto é educacional. As carteiras usam Ed25519, mas ainda não oferecem
+> recuperação de chave, consenso distribuído ou garantias para uso financeiro real.
 
 ## O que já funciona
 
@@ -18,6 +18,8 @@ concorrência básica, persistência SQL, testes automatizados, containerizaçã
 - dashboard web responsivo para visualizar e operar a blockchain;
 - persistência com PostgreSQL em produção e SQLite no desenvolvimento local;
 - carteiras, consulta de saldo e bloqueio de gasto duplo pendente;
+- carteiras Ed25519 geradas no navegador e transações assinadas;
+- validação de assinatura, endereço e nonce contra ataques de replay;
 - migrações de banco com Alembic;
 - testes unitários e de integração;
 - Docker e pipeline de CI no GitHub Actions.
@@ -28,6 +30,7 @@ concorrência básica, persistência SQL, testes automatizados, containerizaçã
 - FastAPI e Uvicorn
 - Pydantic
 - SQLAlchemy, Alembic e Psycopg
+- Cryptography e Web Crypto API
 - PostgreSQL e SQLite
 - Pytest e coverage
 - Ruff
@@ -67,26 +70,21 @@ Acesse:
 - Swagger: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 
-## Teste rápido
+## Teste rápido pelo dashboard
 
-Primeiro minere para que `alice` receba a recompensa da rede:
+1. Abra http://localhost:8000.
+2. Em **Carteira criptográfica**, clique em **Gerar nova carteira**.
+3. Use o endereço preenchido automaticamente para minerar um bloco.
+4. Crie uma transação; o navegador a assinará com Ed25519 antes de enviá-la.
+5. Minere novamente e confira os saldos e a assinatura no explorador.
 
-```bash
-curl -X POST http://localhost:8000/api/v1/mine/alice
-```
+A chave privada fica apenas no `sessionStorage` da aba. Fechar a aba remove o acesso à
+carteira; esse comportamento é intencional nesta versão educacional.
 
-Depois transfira parte do saldo:
-
-```bash
-curl -X POST http://localhost:8000/api/v1/transactions \
-  -H "Content-Type: application/json" \
-  -d '{"sender":"alice","recipient":"bob","amount":"0.50"}'
-```
-
-Minere o próximo bloco:
+Para minerar diretamente pela API:
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/mine/miner-01
+curl -X POST http://localhost:8000/api/v1/mine/SEU_ENDERECO
 ```
 
 Consulte e valide a cadeia:
@@ -109,6 +107,7 @@ curl http://localhost:8000/api/v1/wallets/alice/balance
 | `POST` | `/api/v1/transactions` | Cria uma transação |
 | `POST` | `/api/v1/mine/{miner}` | Minera um bloco |
 | `GET` | `/api/v1/wallets` | Lista carteiras e saldos |
+| `POST` | `/api/v1/wallets/generate` | Gera chaves Ed25519 para uso via API |
 | `GET` | `/api/v1/wallets/{address}/balance` | Consulta o saldo de uma carteira |
 
 ## Qualidade
@@ -133,7 +132,7 @@ src/blockchain_api/
 
 ## Próximas evoluções
 
-- assinar transações com criptografia assimétrica;
+- importar, exportar e recuperar carteiras com segurança;
 - propagar blocos entre nós via WebSocket;
 - implementar consenso entre nós;
 - autenticação, observabilidade e deploy em nuvem.

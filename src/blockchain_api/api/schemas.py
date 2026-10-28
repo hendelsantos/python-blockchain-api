@@ -9,6 +9,9 @@ class TransactionCreate(BaseModel):
     sender: str = Field(min_length=1, max_length=100, examples=["alice"])
     recipient: str = Field(min_length=1, max_length=100, examples=["bob"])
     amount: Decimal = Field(gt=0, decimal_places=8, examples=[10.5])
+    nonce: int = Field(ge=0, examples=[0])
+    public_key: str = Field(min_length=40, max_length=128)
+    signature: str = Field(min_length=40, max_length=256)
 
     @field_validator("sender", "recipient")
     @classmethod

@@ -13,7 +13,10 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL))
+config.set_main_option(
+    "sqlalchemy.url",
+    os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url") or DEFAULT_DATABASE_URL,
+)
 target_metadata = Base.metadata
 
 

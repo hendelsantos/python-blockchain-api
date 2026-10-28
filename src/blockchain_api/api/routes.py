@@ -10,6 +10,7 @@ from blockchain_api.core.blockchain import (
     InsufficientFundsError,
     InvalidTransactionError,
 )
+from blockchain_api.core.crypto import generate_wallet
 
 router = APIRouter(prefix="/api/v1")
 
@@ -65,6 +66,9 @@ def create_transaction(
             sender=payload.sender,
             recipient=payload.recipient,
             amount=payload.amount,
+            nonce=payload.nonce,
+            public_key=payload.public_key,
+            signature=payload.signature,
         )
     except InsufficientFundsError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
@@ -96,6 +100,15 @@ def mine_block(
 def list_wallets(blockchain: BlockchainDependency) -> dict[str, object]:
     wallets = blockchain.list_wallets()
     return {"count": len(wallets), "wallets": [serialize_wallet(wallet) for wallet in wallets]}
+
+
+@router.post("/wallets/generate", summary="Gera um novo par de chaves Ed25519")
+def create_wallet() -> dict[str, str]:
+    wallet = generate_wallet()
+    return {
+        **wallet,
+        "warning": "A chave privada é exibida apenas nesta resposta; guarde-a com segurança.",
+    }
 
 
 @router.get("/wallets/{address}/balance", summary="Consulta o saldo de uma carteira")

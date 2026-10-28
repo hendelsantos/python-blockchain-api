@@ -1,5 +1,8 @@
+from decimal import Decimal
+
 from fastapi.testclient import TestClient
 
+from blockchain_api.core.crypto import generate_wallet, sign_transaction
 from blockchain_api.main import create_app
 
 
@@ -28,13 +31,29 @@ def test_dashboard_and_static_assets_are_served() -> None:
 
 def test_transaction_mining_flow() -> None:
     client = make_client()
+    alice = generate_wallet()
 
-    reward_response = client.post("/api/v1/mine/alice")
+    reward_response = client.post(f"/api/v1/mine/{alice['address']}")
     assert reward_response.status_code == 200
+
+    signature = sign_transaction(
+        private_key=alice["private_key"],
+        sender=alice["address"],
+        recipient="bob",
+        amount=Decimal("0.50"),
+        nonce=0,
+    )
 
     transaction_response = client.post(
         "/api/v1/transactions",
-        json={"sender": "alice", "recipient": "bob", "amount": "0.50"},
+        json={
+            "sender": alice["address"],
+            "recipient": "bob",
+            "amount": "0.50",
+            "nonce": 0,
+            "public_key": alice["public_key"],
+            "signature": signature,
+        },
     )
     assert transaction_response.status_code == 201
 
@@ -49,24 +68,57 @@ def test_transaction_mining_flow() -> None:
     validation_response = client.get("/api/v1/chain/validate")
     assert validation_response.json() == {"valid": True}
 
-    wallet_response = client.get("/api/v1/wallets/alice/balance")
+    wallet_response = client.get(f"/api/v1/wallets/{alice['address']}/balance")
     assert wallet_response.status_code == 200
     assert wallet_response.json()["confirmed"] == "0.50"
 
 
 def test_rejects_transaction_with_insufficient_funds() -> None:
-    response = make_client().post(
+    client = make_client()
+    alice = generate_wallet()
+    signature = sign_transaction(
+        private_key=alice["private_key"],
+        sender=alice["address"],
+        recipient="bob",
+        amount=Decimal("1"),
+        nonce=0,
+    )
+    response = client.post(
         "/api/v1/transactions",
-        json={"sender": "alice", "recipient": "bob", "amount": "1"},
+        json={
+            "sender": alice["address"],
+            "recipient": "bob",
+            "amount": "1",
+            "nonce": 0,
+            "public_key": alice["public_key"],
+            "signature": signature,
+        },
     )
 
     assert response.status_code == 409
 
 
 def test_rejects_same_sender_and_recipient() -> None:
+    wallet = generate_wallet()
     response = make_client().post(
         "/api/v1/transactions",
-        json={"sender": "alice", "recipient": "alice", "amount": "1"},
+        json={
+            "sender": wallet["address"],
+            "recipient": wallet["address"],
+            "amount": "1",
+            "nonce": 0,
+            "public_key": wallet["public_key"],
+            "signature": "x" * 88,
+        },
     )
 
     assert response.status_code == 422
+
+
+def test_generates_cryptographic_wallet() -> None:
+    response = make_client().post("/api/v1/wallets/generate")
+
+    assert response.status_code == 200
+    assert len(response.json()["address"]) == 40
+    assert response.json()["public_key"]
+    assert response.json()["private_key"]

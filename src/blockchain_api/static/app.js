@@ -15,7 +15,71 @@ const elements = {
   walletResult: document.querySelector("#wallet-result"),
   walletList: document.querySelector("#wallet-list"),
   walletCount: document.querySelector("#wallet-count"),
+  generateWalletButton: document.querySelector("#generate-wallet"),
+  activeWallet: document.querySelector("#active-wallet"),
+  senderInput: document.querySelector("#sender-input"),
+  minerInput: document.querySelector("#miner-input"),
 };
+
+const SESSION_WALLETS_KEY = "chainlab.ed25519.wallets";
+
+function getSessionWallets() {
+  try {
+    return JSON.parse(sessionStorage.getItem(SESSION_WALLETS_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function bytesToBase64(bytes) {
+  let binary = "";
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary);
+}
+
+function base64ToBytes(value) {
+  return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+}
+
+function bytesToHex(bytes) {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function canonicalTransactionPayload({ sender, recipient, amount, nonce }) {
+  return JSON.stringify({ amount: String(amount), nonce, recipient, sender });
+}
+
+async function generateBrowserWallet() {
+  const keyPair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+  const publicRaw = new Uint8Array(await crypto.subtle.exportKey("raw", keyPair.publicKey));
+  const privatePkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", keyPair.privateKey));
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", publicRaw));
+  return {
+    address: bytesToHex(digest).slice(0, 40),
+    publicKey: bytesToBase64(publicRaw),
+    privateKey: bytesToBase64(privatePkcs8),
+  };
+}
+
+async function signBrowserTransaction(wallet, transaction) {
+  const privateKey = await crypto.subtle.importKey(
+    "pkcs8",
+    base64ToBytes(wallet.privateKey),
+    { name: "Ed25519" },
+    false,
+    ["sign"],
+  );
+  const payload = new TextEncoder().encode(canonicalTransactionPayload(transaction));
+  return bytesToBase64(new Uint8Array(await crypto.subtle.sign("Ed25519", privateKey, payload)));
+}
+
+function activateWallet(wallet) {
+  elements.activeWallet.textContent = `Ativa: ${wallet.address}`;
+  elements.activeWallet.title = wallet.address;
+  elements.senderInput.value = wallet.address;
+  elements.minerInput.value = wallet.address;
+  elements.walletForm.elements.address.value = wallet.address;
+}
 
 function escapeHtml(value) {
   return String(value)
@@ -71,7 +135,8 @@ function renderWalletBalance(wallet) {
   elements.walletResult.innerHTML = `
     <div class="balance-item"><span>Confirmado</span><strong>${formatAmount(wallet.confirmed)}</strong></div>
     <div class="balance-item"><span>Disponível</span><strong>${formatAmount(wallet.available)}</strong></div>
-    <div class="balance-item"><span>Saída pendente</span><strong>${formatAmount(wallet.pending_outgoing)}</strong></div>`;
+    <div class="balance-item"><span>Saída pendente</span><strong>${formatAmount(wallet.pending_outgoing)}</strong></div>
+    <div class="balance-item"><span>Próximo nonce</span><strong>${wallet.next_nonce}</strong></div>`;
 }
 
 function renderWallets(wallets) {
@@ -99,6 +164,7 @@ function renderChain(chain) {
       ? block.transactions.map((transaction) => `
           <span class="transaction-chip">
             ${escapeHtml(transaction.sender)} → ${escapeHtml(transaction.recipient)} · ${escapeHtml(transaction.amount)}
+            ${transaction.signature ? '<span class="signature-mark" title="Assinatura Ed25519 verificada">✓ assinada</span>' : ""}
           </span>`).join("")
       : '<span class="transaction-chip">Bloco gênesis</span>';
 
@@ -153,16 +219,30 @@ elements.transactionForm.addEventListener("submit", async (event) => {
   const form = new FormData(formElement);
   button.disabled = true;
   try {
+    const wallets = getSessionWallets();
+    const wallet = wallets[form.get("sender")];
+    if (!wallet) {
+      throw new Error("Gere ou recupere a carteira do remetente nesta aba.");
+    }
+    const balance = await request(`${API}/wallets/${encodeURIComponent(wallet.address)}/balance`);
+    const transaction = {
+      sender: wallet.address,
+      recipient: form.get("recipient"),
+      amount: form.get("amount"),
+      nonce: balance.next_nonce,
+    };
+    const signature = await signBrowserTransaction(wallet, transaction);
     await request(`${API}/transactions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        sender: form.get("sender"),
-        recipient: form.get("recipient"),
-        amount: form.get("amount"),
+        ...transaction,
+        public_key: wallet.publicKey,
+        signature,
       }),
     });
     formElement.reset();
+    elements.senderInput.value = wallet.address;
     showToast("Transação adicionada ao próximo bloco.");
     await loadDashboard({ silent: true });
   } catch (error) {
@@ -193,6 +273,22 @@ elements.miningForm.addEventListener("submit", async (event) => {
 
 elements.refreshButton.addEventListener("click", () => loadDashboard());
 
+elements.generateWalletButton.addEventListener("click", async () => {
+  elements.generateWalletButton.disabled = true;
+  try {
+    const wallet = await generateBrowserWallet();
+    const wallets = getSessionWallets();
+    wallets[wallet.address] = wallet;
+    sessionStorage.setItem(SESSION_WALLETS_KEY, JSON.stringify(wallets));
+    activateWallet(wallet);
+    showToast("Carteira Ed25519 criada. Minere um bloco para receber o primeiro token.");
+  } catch (error) {
+    showToast(`Não foi possível gerar a carteira: ${error.message}`, "error");
+  } finally {
+    elements.generateWalletButton.disabled = false;
+  }
+});
+
 elements.walletForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const address = new FormData(event.currentTarget).get("address");
@@ -205,3 +301,6 @@ elements.walletForm.addEventListener("submit", async (event) => {
 });
 
 loadDashboard({ silent: true });
+
+const restoredWallets = Object.values(getSessionWallets());
+if (restoredWallets.length) activateWallet(restoredWallets.at(-1));

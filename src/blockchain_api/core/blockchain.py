@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from threading import RLock
 
+from blockchain_api.core.crypto import address_from_public_key, verify_transaction_signature
 from blockchain_api.core.repository import BlockchainRepository, InMemoryBlockchainRepository
 from blockchain_api.domain.models import Block, Transaction
 
@@ -17,6 +18,14 @@ class InvalidTransactionError(ValueError):
 
 class InsufficientFundsError(InvalidTransactionError):
     """A carteira não possui saldo disponível para a transação."""
+
+
+class InvalidSignatureError(InvalidTransactionError):
+    """A assinatura ou a chave pública não corresponde ao remetente."""
+
+
+class InvalidNonceError(InvalidTransactionError):
+    """O nonce não é o próximo esperado para a carteira."""
 
 
 class Blockchain:
@@ -72,7 +81,16 @@ class Blockchain:
         with self._lock:
             return tuple(self._pending_transactions)
 
-    def add_transaction(self, sender: str, recipient: str, amount: Decimal) -> Transaction:
+    def add_transaction(
+        self,
+        sender: str,
+        recipient: str,
+        amount: Decimal,
+        *,
+        nonce: int,
+        public_key: str,
+        signature: str,
+    ) -> Transaction:
         sender = sender.strip()
         recipient = recipient.strip()
         if not sender or not recipient:
@@ -83,14 +101,45 @@ class Blockchain:
             raise InvalidTransactionError("NETWORK é um remetente reservado")
         if amount <= 0:
             raise InvalidTransactionError("o valor deve ser maior que zero")
+        if nonce < 0:
+            raise InvalidNonceError("o nonce deve ser maior ou igual a zero")
 
         with self._lock:
+            try:
+                derived_address = address_from_public_key(public_key)
+            except (ValueError, TypeError) as exc:
+                raise InvalidSignatureError("chave pública inválida") from exc
+            if derived_address != sender:
+                raise InvalidSignatureError("a chave pública não corresponde ao remetente")
+
+            expected_nonce = self.get_next_nonce(sender)
+            if nonce != expected_nonce:
+                raise InvalidNonceError(
+                    f"nonce inválido: esperado {expected_nonce}, recebido {nonce}"
+                )
+            if not verify_transaction_signature(
+                public_key=public_key,
+                signature=signature,
+                sender=sender,
+                recipient=recipient,
+                amount=amount,
+                nonce=nonce,
+            ):
+                raise InvalidSignatureError("assinatura da transação inválida")
+
             available = self.get_balance(sender)["available"]
             if amount > available:
                 raise InsufficientFundsError(
                     f"saldo insuficiente: disponível {available}, solicitado {amount}"
                 )
-            transaction = Transaction(sender=sender, recipient=recipient, amount=amount)
+            transaction = Transaction(
+                sender=sender,
+                recipient=recipient,
+                amount=amount,
+                nonce=nonce,
+                public_key=public_key,
+                signature=signature,
+            )
             self._repository.add_pending_transaction(transaction)
             self._pending_transactions.append(transaction)
         return transaction
@@ -114,7 +163,7 @@ class Blockchain:
             self._pending_transactions.clear()
             return mined_block
 
-    def get_balance(self, address: str) -> dict[str, Decimal]:
+    def get_balance(self, address: str) -> dict[str, Decimal | int]:
         """Retorna os saldos confirmado e disponível de uma carteira."""
 
         address = address.strip()
@@ -141,7 +190,20 @@ class Blockchain:
             "confirmed": confirmed,
             "available": confirmed - pending_outgoing,
             "pending_outgoing": pending_outgoing,
+            "next_nonce": self.get_next_nonce(address),
         }
+
+    def get_next_nonce(self, address: str) -> int:
+        confirmed_count = sum(
+            1
+            for block in self._chain
+            for transaction in block.transactions
+            if transaction.sender == address
+        )
+        pending_count = sum(
+            1 for transaction in self._pending_transactions if transaction.sender == address
+        )
+        return confirmed_count + pending_count
 
     def list_wallets(self) -> list[dict[str, object]]:
         """Lista endereços conhecidos e seus saldos, exceto a conta da rede."""
@@ -175,4 +237,37 @@ class Blockchain:
                     return False
                 if not current.calculate_hash().startswith("0" * self.difficulty):
                     return False
+            expected_nonces: dict[str, int] = {}
+            for block in self._chain:
+                for transaction in block.transactions:
+                    if transaction.sender == "NETWORK":
+                        continue
+                    expected = expected_nonces.get(transaction.sender, 0)
+                    cryptographic_fields = (
+                        transaction.nonce,
+                        transaction.public_key,
+                        transaction.signature,
+                    )
+                    if all(value is None for value in cryptographic_fields):
+                        expected_nonces[transaction.sender] = expected + 1
+                        continue
+                    if any(value is None for value in cryptographic_fields):
+                        return False
+                    if transaction.nonce != expected:
+                        return False
+                    try:
+                        if address_from_public_key(transaction.public_key) != transaction.sender:
+                            return False
+                    except (ValueError, TypeError):
+                        return False
+                    if not verify_transaction_signature(
+                        public_key=transaction.public_key,
+                        signature=transaction.signature,
+                        sender=transaction.sender,
+                        recipient=transaction.recipient,
+                        amount=transaction.amount,
+                        nonce=transaction.nonce,
+                    ):
+                        return False
+                    expected_nonces[transaction.sender] = expected + 1
             return True

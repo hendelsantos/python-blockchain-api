@@ -6,14 +6,43 @@ import pytest
 from blockchain_api.core.blockchain import (
     Blockchain,
     InsufficientFundsError,
+    InvalidNonceError,
+    InvalidSignatureError,
     InvalidTransactionError,
 )
+from blockchain_api.core.crypto import generate_wallet, sign_transaction
+
+
+def add_signed_transaction(
+    blockchain: Blockchain,
+    wallet: dict[str, str],
+    recipient: str,
+    amount: Decimal,
+) -> None:
+    nonce = blockchain.get_next_nonce(wallet["address"])
+    signature = sign_transaction(
+        private_key=wallet["private_key"],
+        sender=wallet["address"],
+        recipient=recipient,
+        amount=amount,
+        nonce=nonce,
+    )
+    blockchain.add_transaction(
+        wallet["address"],
+        recipient,
+        amount,
+        nonce=nonce,
+        public_key=wallet["public_key"],
+        signature=signature,
+    )
 
 
 def test_add_and_mine_transaction() -> None:
     blockchain = Blockchain(difficulty=1)
-    blockchain.mine_pending_transactions("alice")
-    transaction = blockchain.add_transaction("alice", "bob", Decimal("0.75"))
+    alice = generate_wallet()
+    blockchain.mine_pending_transactions(alice["address"])
+    add_signed_transaction(blockchain, alice, "bob", Decimal("0.75"))
+    transaction = blockchain.pending_transactions[0]
 
     assert transaction in blockchain.pending_transactions
 
@@ -25,22 +54,64 @@ def test_add_and_mine_transaction() -> None:
     assert block.calculate_hash().startswith("0")
     assert blockchain.pending_transactions == ()
     assert blockchain.is_valid()
-    assert blockchain.get_balance("alice")["confirmed"] == Decimal("0.25")
+    assert blockchain.get_balance(alice["address"])["confirmed"] == Decimal("0.25")
     assert blockchain.get_balance("bob")["confirmed"] == Decimal("0.75")
 
 
 def test_rejects_insufficient_funds_and_pending_double_spend() -> None:
     blockchain = Blockchain(difficulty=1)
-    blockchain.mine_pending_transactions("alice")
-    blockchain.add_transaction("alice", "bob", Decimal("0.75"))
+    alice = generate_wallet()
+    blockchain.mine_pending_transactions(alice["address"])
+    add_signed_transaction(blockchain, alice, "bob", Decimal("0.75"))
 
     with pytest.raises(InsufficientFundsError):
-        blockchain.add_transaction("alice", "charlie", Decimal("0.50"))
+        add_signed_transaction(blockchain, alice, "charlie", Decimal("0.50"))
 
-    balance = blockchain.get_balance("alice")
+    balance = blockchain.get_balance(alice["address"])
     assert balance["confirmed"] == Decimal("1")
     assert balance["available"] == Decimal("0.25")
     assert balance["pending_outgoing"] == Decimal("0.75")
+
+
+def test_rejects_invalid_signature_and_replayed_nonce() -> None:
+    blockchain = Blockchain(difficulty=1)
+    alice = generate_wallet()
+    blockchain.mine_pending_transactions(alice["address"])
+    signature = sign_transaction(
+        private_key=alice["private_key"],
+        sender=alice["address"],
+        recipient="bob",
+        amount=Decimal("0.25"),
+        nonce=0,
+    )
+
+    with pytest.raises(InvalidSignatureError):
+        blockchain.add_transaction(
+            alice["address"],
+            "charlie",
+            Decimal("0.25"),
+            nonce=0,
+            public_key=alice["public_key"],
+            signature=signature,
+        )
+
+    blockchain.add_transaction(
+        alice["address"],
+        "bob",
+        Decimal("0.25"),
+        nonce=0,
+        public_key=alice["public_key"],
+        signature=signature,
+    )
+    with pytest.raises(InvalidNonceError):
+        blockchain.add_transaction(
+            alice["address"],
+            "bob",
+            Decimal("0.25"),
+            nonce=0,
+            public_key=alice["public_key"],
+            signature=signature,
+        )
 
 
 @pytest.mark.parametrize(
@@ -57,7 +128,14 @@ def test_rejects_invalid_transactions(sender: str, recipient: str, amount: Decim
     blockchain = Blockchain(difficulty=1)
 
     with pytest.raises(InvalidTransactionError):
-        blockchain.add_transaction(sender, recipient, amount)
+        blockchain.add_transaction(
+            sender,
+            recipient,
+            amount,
+            nonce=0,
+            public_key="invalid-public-key",
+            signature="invalid-signature",
+        )
 
 
 def test_detects_a_tampered_chain() -> None:

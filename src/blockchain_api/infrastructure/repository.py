@@ -20,7 +20,7 @@ class BlockRecord(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     block_index: Mapped[int] = mapped_column(Integer, unique=True, nullable=False, index=True)
     timestamp: Mapped[str] = mapped_column(String(64), nullable=False)
-    transactions_json: Mapped[list[dict[str, str]]] = mapped_column(JSON, nullable=False)
+    transactions_json: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False)
     previous_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     nonce: Mapped[int] = mapped_column(Integer, nullable=False)
     block_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
@@ -33,6 +33,9 @@ class PendingTransactionRecord(Base):
     sender: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     recipient: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     amount: Mapped[str] = mapped_column(String(80), nullable=False)
+    nonce: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    public_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    signature: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
 
 class SQLAlchemyBlockchainRepository:
@@ -46,9 +49,22 @@ class SQLAlchemyBlockchainRepository:
             timestamp=record.timestamp,
             transactions=tuple(
                 Transaction(
-                    sender=transaction["sender"],
-                    recipient=transaction["recipient"],
-                    amount=Decimal(transaction["amount"]),
+                    sender=str(transaction["sender"]),
+                    recipient=str(transaction["recipient"]),
+                    amount=Decimal(str(transaction["amount"])),
+                    nonce=(
+                        int(transaction["nonce"]) if transaction.get("nonce") is not None else None
+                    ),
+                    public_key=(
+                        str(transaction["public_key"])
+                        if transaction.get("public_key") is not None
+                        else None
+                    ),
+                    signature=(
+                        str(transaction["signature"])
+                        if transaction.get("signature") is not None
+                        else None
+                    ),
                 )
                 for transaction in record.transactions_json
             ),
@@ -85,6 +101,9 @@ class SQLAlchemyBlockchainRepository:
                     sender=record.sender,
                     recipient=record.recipient,
                     amount=Decimal(record.amount),
+                    nonce=record.nonce,
+                    public_key=record.public_key,
+                    signature=record.signature,
                 )
                 for record in records
             ]
@@ -100,6 +119,9 @@ class SQLAlchemyBlockchainRepository:
                     sender=transaction.sender,
                     recipient=transaction.recipient,
                     amount=str(transaction.amount),
+                    nonce=transaction.nonce,
+                    public_key=transaction.public_key,
+                    signature=transaction.signature,
                 )
             )
 

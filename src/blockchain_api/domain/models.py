@@ -15,13 +15,23 @@ class Transaction:
     sender: str
     recipient: str
     amount: Decimal
+    nonce: int | None = None
+    public_key: str | None = None
+    signature: str | None = None
 
-    def to_dict(self) -> dict[str, str]:
-        return {
+    def to_dict(self) -> dict[str, str | int]:
+        data: dict[str, str | int] = {
             "sender": self.sender,
             "recipient": self.recipient,
             "amount": str(self.amount),
         }
+        if self.nonce is not None:
+            data["nonce"] = self.nonce
+        if self.public_key is not None:
+            data["public_key"] = self.public_key
+        if self.signature is not None:
+            data["signature"] = self.signature
+        return data
 
 
 @dataclass(frozen=True, slots=True)

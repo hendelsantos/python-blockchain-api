@@ -2,12 +2,16 @@
 
 from contextlib import asynccontextmanager
 from pathlib import Path
+from time import perf_counter
+from uuid import uuid4
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from prometheus_client import CONTENT_TYPE_LATEST
 
 from blockchain_api import __version__
+from blockchain_api.api.observability import Observability
 from blockchain_api.api.realtime import RealtimeManager
 from blockchain_api.api.realtime import router as realtime_router
 from blockchain_api.api.routes import router
@@ -43,9 +47,29 @@ def create_app(
     application.state.blockchain = Blockchain(difficulty=difficulty, repository=repository)
     application.state.node_manager = nodes
     application.state.realtime = RealtimeManager()
+    application.state.observability = Observability()
     application.include_router(router)
     application.include_router(realtime_router)
     application.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+    @application.middleware("http")
+    async def collect_request_metrics(request, call_next):
+        request_id = request.headers.get("X-Request-ID") or uuid4().hex
+        started_at = perf_counter()
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+        finally:
+            route = getattr(request.scope.get("route"), "path", request.url.path)
+            application.state.observability.record_request(
+                method=request.method,
+                route=route,
+                status=status_code,
+                duration=perf_counter() - started_at,
+            )
+        response.headers["X-Request-ID"] = request_id
+        return response
 
     @application.get("/", include_in_schema=False)
     def dashboard() -> FileResponse:
@@ -54,6 +78,18 @@ def create_app(
     @application.get("/health", tags=["health"], summary="Health check")
     def health() -> dict[str, str]:
         return {"status": "ok", "version": __version__}
+
+    @application.get("/metrics", include_in_schema=False)
+    def metrics() -> Response:
+        application.state.observability.update_state(
+            application.state.blockchain,
+            application.state.node_manager,
+            application.state.realtime,
+        )
+        return Response(
+            content=application.state.observability.render(),
+            media_type=CONTENT_TYPE_LATEST,
+        )
 
     return application
 

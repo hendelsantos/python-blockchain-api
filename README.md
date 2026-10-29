@@ -24,6 +24,7 @@ concorrência básica, persistência SQL, testes automatizados, containerizaçã
 - descoberta automática de peers a partir de nós bootstrap;
 - autenticação HMAC-SHA256 nas chamadas internas entre nós;
 - atualizações de blocos em tempo real por WebSocket;
+- métricas Prometheus, IDs de correlação e telemetria de rede;
 - segundo nó isolado e opcional no Docker Compose;
 - migrações de banco com Alembic;
 - testes unitários e de integração;
@@ -56,6 +57,7 @@ Acesse:
 - Dashboard: http://localhost:8000
 - Swagger: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
+- Métricas: http://localhost:8000/metrics
 
 Para usar outra porta, execute `API_PORT=8123 docker compose up --build`.
 
@@ -133,6 +135,7 @@ curl http://localhost:8000/api/v1/wallets/alice/balance
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/health` | Estado da aplicação |
+| `GET` | `/metrics` | Métricas Prometheus da API e da rede |
 | `GET` | `/api/v1/chain` | Lista a blockchain |
 | `GET` | `/api/v1/chain/validate` | Valida hashes e proof-of-work |
 | `GET` | `/api/v1/transactions/pending` | Lista transações pendentes |
@@ -157,6 +160,13 @@ ruff check .
 ruff format --check .
 ```
 
+## Observabilidade
+
+Cada resposta HTTP recebe o cabeçalho `X-Request-ID`. Você também pode enviar esse
+cabeçalho para rastrear uma operação de ponta a ponta. O endpoint `/metrics` expõe,
+em formato Prometheus, contadores de requisições e latência, além de gauges para
+blocos, transações pendentes, peers e clientes WebSocket.
+
 ## Arquitetura
 
 ```text
@@ -174,7 +184,7 @@ src/blockchain_api/
 - importar, exportar e recuperar carteiras com segurança;
 - persistência e reputação dos peers descobertos;
 - consenso tolerante a falhas bizantinas;
-- autenticação, observabilidade e deploy em nuvem.
+- logs estruturados e deploy em nuvem.
 
 ## Licença
 

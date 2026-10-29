@@ -18,6 +18,22 @@ def test_health_check() -> None:
     assert response.json()["status"] == "ok"
 
 
+def test_exposes_prometheus_metrics_and_request_correlation() -> None:
+    client = make_client()
+
+    health = client.get("/health", headers={"X-Request-ID": "portfolio-request-1"})
+    metrics = client.get("/metrics")
+
+    assert health.headers["X-Request-ID"] == "portfolio-request-1"
+    assert metrics.status_code == 200
+    assert metrics.headers["content-type"].startswith("text/plain")
+    assert (
+        'blockchain_http_requests_total{method="GET",route="/health",status="200"}' in metrics.text
+    )
+    assert "blockchain_chain_length 1.0" in metrics.text
+    assert "blockchain_peer_count 0.0" in metrics.text
+
+
 def test_dashboard_and_static_assets_are_served() -> None:
     client = make_client()
 

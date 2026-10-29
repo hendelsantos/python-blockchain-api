@@ -200,3 +200,29 @@ def test_reports_authenticated_node_network() -> None:
     assert response.status_code == 200
     assert response.json()["authentication_enabled"] is True
     assert response.json()["node_url"] == "http://portfolio.test"
+
+
+def test_registers_and_publicly_verifies_a_traceable_batch() -> None:
+    client = make_client()
+    company = client.post("/api/v1/traceability/companies", json={"name": "Café Serra"})
+    product = client.post(
+        "/api/v1/traceability/products",
+        json={"company_id": company.json()["id"], "code": "CAFE-ARABICA", "name": "Café Arábica"},
+    )
+    batch = client.post(
+        "/api/v1/traceability/batches",
+        json={"product_code": product.json()["code"], "code": "CAF-2026-001"},
+    )
+    event = client.post(
+        "/api/v1/traceability/batches/CAF-2026-001/events",
+        json={"event_type": "COLHEITA", "location": "Fazenda Serra", "details": {"safra": "2026"}},
+    )
+    public = client.get("/api/v1/traceability/public/CAF-2026-001")
+
+    assert company.status_code == product.status_code == batch.status_code == 201
+    assert event.status_code == 201
+    assert len(event.json()["event_hash"]) == 64
+    assert event.json()["block_index"] == 1
+    assert public.status_code == 200
+    assert public.json()["company"]["name"] == "Café Serra"
+    assert public.json()["events"][0]["event_hash"] == event.json()["event_hash"]

@@ -29,3 +29,25 @@ class MessageResponse(BaseModel):
 
 class PeerRegistration(BaseModel):
     urls: list[str] = Field(min_length=1, max_length=20)
+
+
+class CompanyCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+    document: str | None = Field(default=None, max_length=32)
+
+
+class ProductCreate(BaseModel):
+    company_id: str = Field(min_length=1, max_length=64)
+    code: str = Field(min_length=2, max_length=64)
+    name: str = Field(min_length=2, max_length=160)
+
+
+class BatchCreate(BaseModel):
+    product_code: str = Field(min_length=2, max_length=64)
+    code: str = Field(min_length=2, max_length=80)
+
+
+class TraceEventCreate(BaseModel):
+    event_type: str = Field(min_length=2, max_length=64)
+    location: str = Field(min_length=2, max_length=160)
+    details: dict[str, object] = Field(default_factory=dict)

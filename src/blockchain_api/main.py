@@ -18,7 +18,12 @@ from blockchain_api.api.routes import router
 from blockchain_api.core.blockchain import Blockchain
 from blockchain_api.core.network import NodeManager
 from blockchain_api.core.repository import BlockchainRepository
-from blockchain_api.infrastructure.database import build_repository
+from blockchain_api.core.traceability import (
+    InMemoryTraceabilityRepository,
+    TraceabilityRepository,
+    TraceabilityService,
+)
+from blockchain_api.infrastructure.database import build_repository, build_traceability_repository
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -28,6 +33,7 @@ def create_app(
     difficulty: int = 3,
     repository: BlockchainRepository | None = None,
     node_manager: NodeManager | None = None,
+    traceability_repository: TraceabilityRepository | None = None,
 ) -> FastAPI:
     nodes = node_manager or NodeManager()
 
@@ -47,6 +53,9 @@ def create_app(
     application.state.blockchain = Blockchain(difficulty=difficulty, repository=repository)
     application.state.node_manager = nodes
     application.state.realtime = RealtimeManager()
+    application.state.traceability = TraceabilityService(
+        traceability_repository or InMemoryTraceabilityRepository()
+    )
     application.state.observability = Observability()
     application.include_router(router)
     application.include_router(realtime_router)
@@ -94,4 +103,7 @@ def create_app(
     return application
 
 
-app = create_app(repository=build_repository())
+app = create_app(
+    repository=build_repository(),
+    traceability_repository=build_traceability_repository(),
+)

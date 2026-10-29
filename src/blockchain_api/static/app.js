@@ -27,6 +27,8 @@ const elements = {
   discoverPeers: document.querySelector("#discover-peers"),
   resolveConsensus: document.querySelector("#resolve-consensus"),
   networkSecurity: document.querySelector("#network-security"),
+  traceabilityForm: document.querySelector("#traceability-form"),
+  traceabilityResult: document.querySelector("#traceability-result"),
 };
 
 const SESSION_WALLETS_KEY = "chainlab.ed25519.wallets";
@@ -341,6 +343,26 @@ elements.walletForm.addEventListener("submit", async (event) => {
     renderWalletBalance(wallet);
   } catch (error) {
     showToast(error.message, "error");
+  }
+});
+
+elements.traceabilityForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const code = new FormData(event.currentTarget).get("batch_code");
+  try {
+    const trace = await request(`${API}/traceability/public/${encodeURIComponent(code)}`);
+    const events = trace.events.map((item) => `
+      <li><strong>${escapeHtml(item.event_type)}</strong> · ${escapeHtml(item.location)}
+        <span>bloco #${item.block_index} · ${escapeHtml(item.event_hash.slice(0, 14))}…</span>
+      </li>`).join("");
+    elements.traceabilityResult.classList.remove("empty-wallet");
+    elements.traceabilityResult.innerHTML = `
+      <div class="trace-title"><strong>${escapeHtml(trace.product.name)}</strong><span>${escapeHtml(trace.batch.code)}</span></div>
+      <p>Origem: ${escapeHtml(trace.company.name)}</p>
+      <ul>${events || "<li>Nenhum evento registrado.</li>"}</ul>`;
+  } catch (error) {
+    elements.traceabilityResult.className = "traceability-result empty-wallet";
+    elements.traceabilityResult.textContent = error.message;
   }
 });
 

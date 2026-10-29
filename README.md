@@ -25,6 +25,7 @@ concorrência básica, persistência SQL, testes automatizados, containerizaçã
 - autenticação HMAC-SHA256 nas chamadas internas entre nós;
 - atualizações de blocos em tempo real por WebSocket;
 - métricas Prometheus, IDs de correlação e telemetria de rede;
+- empresas, produtos, lotes e eventos B2B ancorados em blocos;
 - segundo nó isolado e opcional no Docker Compose;
 - migrações de banco com Alembic;
 - testes unitários e de integração;
@@ -150,6 +151,11 @@ curl http://localhost:8000/api/v1/wallets/alice/balance
 | `POST` | `/api/v1/nodes/resolve` | Executa o consenso entre peers |
 | `GET` | `/api/v1/nodes/chain` | Compartilha a cadeia com peers autenticados |
 | `GET` | `/api/v1/nodes/peers` | Compartilha peers com nós autenticados |
+| `POST` | `/api/v1/traceability/companies` | Cadastra uma empresa participante |
+| `POST` | `/api/v1/traceability/products` | Cadastra um produto rastreável |
+| `POST` | `/api/v1/traceability/batches` | Cadastra um lote de produto |
+| `POST` | `/api/v1/traceability/batches/{batch_code}/events` | Registra e ancora um evento no blockchain |
+| `GET` | `/api/v1/traceability/public/{batch_code}` | Consulta pública da origem e eventos do lote |
 | `WS` | `/ws/blocks` | Eventos de blocos e transações em tempo real |
 
 ## Qualidade
@@ -166,6 +172,13 @@ Cada resposta HTTP recebe o cabeçalho `X-Request-ID`. Você também pode enviar
 cabeçalho para rastrear uma operação de ponta a ponta. O endpoint `/metrics` expõe,
 em formato Prometheus, contadores de requisições e latência, além de gauges para
 blocos, transações pendentes, peers e clientes WebSocket.
+
+## Rastreabilidade B2B
+
+O MVP permite criar uma empresa, produto e lote, depois registrar eventos como
+produção, inspeção ou transporte. Cada evento recebe um hash SHA-256 e é confirmado
+em um bloco pela conta interna `TRACEABILITY`, sem movimentar tokens. Consulte um
+lote publicamente em `GET /api/v1/traceability/public/{codigo-do-lote}`.
 
 ## Arquitetura
 

@@ -23,6 +23,7 @@
         <a href="#blockchain">Blockchain</a>
         <a href="#operations">Operações</a>
         <a href="#wallets">Carteiras</a>
+        <a href="#traceability">Rastreabilidade</a>
         <a href="#network">Rede</a>
         <a href="/metrics" target="_blank" rel="noreferrer">Métricas ↗</a>
         <a class="docs-link" href="/docs" target="_blank" rel="noreferrer">API Docs ↗</a>
@@ -170,6 +171,26 @@
             </div>
           </article>
         </div>
+      </section>
+
+      <section class="traceability-section" id="traceability">
+        <div class="section-heading">
+          <div>
+            <span class="kicker">B2B TRACEABILITY</span>
+            <h2>Consulta de lote</h2>
+          </div>
+          <p>Verifique a origem e os eventos confirmados de um produto.</p>
+        </div>
+        <article class="panel traceability-panel">
+          <form id="traceability-form" class="traceability-form">
+            <label>
+              Código público do lote
+              <input name="batch_code" placeholder="CAF-2026-001" maxlength="80" required />
+            </label>
+            <button class="button primary" type="submit">Verificar rastreio</button>
+          </form>
+          <div id="traceability-result" class="traceability-result empty-wallet">Informe o código do lote.</div>
+        </article>
       </section>
 
       <section class="network-section" id="network">

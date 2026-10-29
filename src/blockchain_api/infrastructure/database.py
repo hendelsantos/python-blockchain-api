@@ -10,7 +10,10 @@ from alembic.config import Config
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.engine import Engine
 
-from blockchain_api.infrastructure.repository import SQLAlchemyBlockchainRepository
+from blockchain_api.infrastructure.repository import (
+    SQLAlchemyBlockchainRepository,
+    SQLAlchemyTraceabilityRepository,
+)
 
 DEFAULT_DATABASE_URL = "sqlite:///./blockchain.db"
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -51,3 +54,12 @@ def build_repository(database_url: str | None = None) -> SQLAlchemyBlockchainRep
     engine = create_database_engine(resolved_url)
     apply_migrations(engine, resolved_url)
     return SQLAlchemyBlockchainRepository(engine)
+
+
+def build_traceability_repository(
+    database_url: str | None = None,
+) -> SQLAlchemyTraceabilityRepository:
+    resolved_url = database_url or os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+    engine = create_database_engine(resolved_url)
+    apply_migrations(engine, resolved_url)
+    return SQLAlchemyTraceabilityRepository(engine)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -97,8 +98,8 @@ class Blockchain:
             raise InvalidTransactionError("remetente e destinatário são obrigatórios")
         if sender == recipient:
             raise InvalidTransactionError("remetente e destinatário devem ser diferentes")
-        if sender.upper() == "NETWORK":
-            raise InvalidTransactionError("NETWORK é um remetente reservado")
+        if sender.upper() in {"NETWORK", "TRACEABILITY"}:
+            raise InvalidTransactionError("remetente reservado para operações internas")
         if amount <= 0:
             raise InvalidTransactionError("o valor deve ser maior que zero")
         if nonce < 0:
@@ -163,6 +164,30 @@ class Blockchain:
             self._pending_transactions.clear()
             return mined_block
 
+    def anchor_traceability_event(self, event_hash: str, miner: str = "traceability-node") -> Block:
+        """Confirma um hash de evento B2B diretamente em um novo bloco."""
+
+        if not re.fullmatch(r"[a-f0-9]{64}", event_hash):
+            raise InvalidTransactionError("hash do evento de rastreabilidade inválido")
+        with self._lock:
+            anchor = Transaction(
+                sender="TRACEABILITY",
+                recipient=event_hash,
+                amount=Decimal("0"),
+            )
+            reward = Transaction(sender="NETWORK", recipient=miner, amount=self.mining_reward)
+            block = Block(
+                index=len(self._chain),
+                timestamp=self._now(),
+                transactions=(*self._pending_transactions, anchor, reward),
+                previous_hash=self._chain[-1].calculate_hash(),
+            )
+            mined_block = self._proof_of_work(block)
+            self._repository.commit_mined_block(mined_block)
+            self._chain.append(mined_block)
+            self._pending_transactions.clear()
+            return mined_block
+
     def get_balance(self, address: str) -> dict[str, Decimal | int]:
         """Retorna os saldos confirmado e disponível de uma carteira."""
 
@@ -211,9 +236,9 @@ class Blockchain:
         addresses: set[str] = set()
         for block in self._chain:
             for transaction in block.transactions:
-                if transaction.sender != "NETWORK":
+                if transaction.sender not in {"NETWORK", "TRACEABILITY"}:
                     addresses.add(transaction.sender)
-                if transaction.recipient != "NETWORK":
+                if transaction.sender != "TRACEABILITY" and transaction.recipient != "NETWORK":
                     addresses.add(transaction.recipient)
         for transaction in self._pending_transactions:
             addresses.update((transaction.sender, transaction.recipient))
@@ -246,6 +271,16 @@ class Blockchain:
         for block in blocks:
             for transaction in block.transactions:
                 if transaction.sender == "NETWORK":
+                    continue
+                if transaction.sender == "TRACEABILITY":
+                    if (
+                        transaction.amount != 0
+                        or transaction.nonce is not None
+                        or transaction.public_key is not None
+                        or transaction.signature is not None
+                        or not re.fullmatch(r"[a-f0-9]{64}", transaction.recipient)
+                    ):
+                        return False
                     continue
                 expected = expected_nonces.get(transaction.sender, 0)
                 cryptographic_fields = (

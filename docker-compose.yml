@@ -18,11 +18,19 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-blockchain}:${POSTGRES_PASSWORD:-blockchain-dev}@db:5432/${POSTGRES_DB:-blockchain}
       NODE_ID: node-1
+      NODE_URL: http://api:8000
+      NODE_SHARED_SECRET: ${NODE_SHARED_SECRET:-local-network-secret}
+      PEER_URLS: http://node2:8000
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     command: >-
       sh -c "alembic upgrade head &&
       uvicorn blockchain_api.main:app --host 0.0.0.0 --port 8000"
@@ -48,10 +56,15 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://blockchain:${POSTGRES_PASSWORD:-blockchain-dev}@db2:5432/blockchain_node2
       NODE_ID: node-2
+      NODE_URL: http://node2:8000
+      NODE_SHARED_SECRET: ${NODE_SHARED_SECRET:-local-network-secret}
+      PEER_URLS: http://api:8000
     ports:
       - "${NODE2_PORT:-8002}:8000"
     depends_on:
       db2:
+        condition: service_healthy
+      api:
         condition: service_healthy
     command: >-
       sh -c "alembic upgrade head &&

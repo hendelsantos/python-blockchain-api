@@ -26,7 +26,8 @@ def test_consensus_adopts_a_longer_valid_chain() -> None:
     remote.mine_pending_transactions("miner-b")
 
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url == "http://node2.test/api/v1/chain"
+        assert request.url == "http://node2.test/api/v1/nodes/chain"
+        assert request.headers["X-Node-ID"] == "node-1"
         return httpx.Response(
             200,
             json={
@@ -38,6 +39,7 @@ def test_consensus_adopts_a_longer_valid_chain() -> None:
     manager = NodeManager(
         node_id="node-1",
         initial_peers=["http://node2.test"],
+        shared_secret="test-network-secret",
         transport=httpx.MockTransport(handler),
     )
     result = asyncio.run(manager.resolve_conflicts(local))
@@ -62,3 +64,63 @@ def test_consensus_ignores_unreachable_peer() -> None:
 
     assert result["replaced"] is False
     assert result["errors"] == {"http://offline.test": "ConnectError"}
+
+
+def test_hmac_signature_rejects_tampering_and_expiration() -> None:
+    manager = NodeManager(
+        node_id="node-1",
+        initial_peers=[],
+        shared_secret="test-network-secret",
+    )
+    path = "/api/v1/nodes/chain"
+    headers = manager.signed_headers("GET", path, timestamp=1_000)
+
+    assert manager.verify_signature(
+        node_id=headers["X-Node-ID"],
+        timestamp=headers["X-Node-Timestamp"],
+        signature=headers["X-Node-Signature"],
+        method="GET",
+        path=path,
+        now=1_010,
+    )
+    assert not manager.verify_signature(
+        node_id=headers["X-Node-ID"],
+        timestamp=headers["X-Node-Timestamp"],
+        signature=headers["X-Node-Signature"],
+        method="POST",
+        path=path,
+        now=1_010,
+    )
+    assert not manager.verify_signature(
+        node_id=headers["X-Node-ID"],
+        timestamp=headers["X-Node-Timestamp"],
+        signature=headers["X-Node-Signature"],
+        method="GET",
+        path=path,
+        now=1_031,
+    )
+
+
+def test_discovers_peers_announced_by_a_seed() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url == "http://node2.test/api/v1/nodes/peers"
+        return httpx.Response(
+            200,
+            json={
+                "node_id": "node-2",
+                "peers": ["http://node1.test", "http://node3.test"],
+            },
+        )
+
+    manager = NodeManager(
+        node_id="node-1",
+        node_url="http://node1.test",
+        initial_peers=["http://node2.test"],
+        shared_secret="test-network-secret",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = asyncio.run(manager.discover_peers())
+
+    assert result["discovered"] == ["http://node3.test"]
+    assert manager.peers == ("http://node2.test", "http://node3.test")

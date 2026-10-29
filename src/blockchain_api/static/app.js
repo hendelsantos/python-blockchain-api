@@ -24,7 +24,9 @@ const elements = {
   peerList: document.querySelector("#peer-list"),
   peerCount: document.querySelector("#peer-count"),
   nodeId: document.querySelector("#node-id"),
+  discoverPeers: document.querySelector("#discover-peers"),
   resolveConsensus: document.querySelector("#resolve-consensus"),
+  networkSecurity: document.querySelector("#network-security"),
 };
 
 const SESSION_WALLETS_KEY = "chainlab.ed25519.wallets";
@@ -166,6 +168,9 @@ function renderNetwork(network) {
   elements.peerList.innerHTML = network.peers.length
     ? network.peers.map((peer) => `<div class="peer-row">${escapeHtml(peer)}</div>`).join("")
     : '<div class="empty-wallet">Nenhum peer registrado.</div>';
+  elements.networkSecurity.textContent = network.authentication_enabled
+    ? "Comunicação entre nós autenticada por HMAC"
+    : "Autenticação entre nós desativada";
 }
 
 async function loadNetwork() {
@@ -369,6 +374,21 @@ elements.resolveConsensus.addEventListener("click", async () => {
     showToast(error.message, "error");
   } finally {
     elements.resolveConsensus.disabled = false;
+  }
+});
+
+elements.discoverPeers.addEventListener("click", async () => {
+  elements.discoverPeers.disabled = true;
+  try {
+    const result = await request(`${API}/nodes/discover`, { method: "POST" });
+    await loadNetwork();
+    showToast(result.discovered.length
+      ? `${result.discovered.length} novo(s) peer(s) descoberto(s).`
+      : "Nenhum novo peer foi encontrado.");
+  } catch (error) {
+    showToast(error.message, "error");
+  } finally {
+    elements.discoverPeers.disabled = false;
   }
 });
 

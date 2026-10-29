@@ -36,6 +36,23 @@ NodeManagerDependency = Annotated[NodeManager, Depends(get_node_manager)]
 RealtimeDependency = Annotated[RealtimeManager, Depends(get_realtime_manager)]
 
 
+def require_node_signature(
+    request: Request,
+    nodes: NodeManagerDependency,
+) -> None:
+    if not nodes.verify_signature(
+        node_id=request.headers.get("X-Node-ID"),
+        timestamp=request.headers.get("X-Node-Timestamp"),
+        signature=request.headers.get("X-Node-Signature"),
+        method=request.method,
+        path=request.url.path,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="assinatura do nó ausente, inválida ou expirada",
+        )
+
+
 def serialize_wallet(wallet: dict[str, object]) -> dict[str, object]:
     return {
         key: str(value) if key in {"confirmed", "available", "pending_outgoing"} else value
@@ -153,7 +170,31 @@ def get_nodes(
         "peers": nodes.peers,
         "peer_count": len(nodes.peers),
         "websocket_clients": realtime.connection_count,
+        "authentication_enabled": nodes.authentication_enabled,
+        "node_url": nodes.node_url,
     }
+
+
+@router.get(
+    "/nodes/chain",
+    summary="Retorna a cadeia para um peer autenticado",
+    dependencies=[Depends(require_node_signature)],
+)
+def get_node_chain(blockchain: BlockchainDependency) -> dict[str, object]:
+    chain = blockchain.chain
+    return {"length": len(chain), "chain": [block.to_dict() for block in chain]}
+
+
+@router.get(
+    "/nodes/peers",
+    summary="Retorna peers para descoberta autenticada",
+    dependencies=[Depends(require_node_signature)],
+)
+def get_node_peers(nodes: NodeManagerDependency) -> dict[str, object]:
+    advertised = [*nodes.peers]
+    if nodes.node_url:
+        advertised.append(nodes.node_url)
+    return {"node_id": nodes.node_id, "peers": sorted(set(advertised))}
 
 
 @router.post("/nodes/register", summary="Registra peers HTTP")
@@ -169,6 +210,11 @@ def register_nodes(
             detail=str(exc),
         ) from exc
     return {"message": "Peers registrados", "peers": peers, "count": len(peers)}
+
+
+@router.post("/nodes/discover", summary="Descobre peers anunciados pela rede")
+async def discover_nodes(nodes: NodeManagerDependency) -> dict[str, object]:
+    return await nodes.discover_peers()
 
 
 @router.post("/nodes/resolve", summary="Executa o consenso da cadeia válida mais longa")

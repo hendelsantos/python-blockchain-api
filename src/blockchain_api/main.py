@@ -1,5 +1,6 @@
 """Ponto de entrada da aplicação FastAPI."""
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -22,16 +23,25 @@ def create_app(
     *,
     difficulty: int = 3,
     repository: BlockchainRepository | None = None,
+    node_manager: NodeManager | None = None,
 ) -> FastAPI:
+    nodes = node_manager or NodeManager()
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        await nodes.discover_peers()
+        yield
+
     application = FastAPI(
         title="Python Blockchain API",
         description="Blockchain educacional com proof-of-work e API REST.",
         version=__version__,
         contact={"name": "Hendel Santos"},
         license_info={"name": "MIT"},
+        lifespan=lifespan,
     )
     application.state.blockchain = Blockchain(difficulty=difficulty, repository=repository)
-    application.state.node_manager = NodeManager()
+    application.state.node_manager = nodes
     application.state.realtime = RealtimeManager()
     application.include_router(router)
     application.include_router(realtime_router)

@@ -3,6 +3,7 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 
 from blockchain_api.core.crypto import generate_wallet, sign_transaction
+from blockchain_api.core.network import NodeManager
 from blockchain_api.main import create_app
 
 
@@ -150,3 +151,36 @@ def test_websocket_receives_new_block_event() -> None:
     assert response.status_code == 200
     assert event["type"] == "block_mined"
     assert event["block"]["index"] == 1
+
+
+def test_internal_node_endpoints_require_valid_hmac_signature() -> None:
+    nodes = NodeManager(
+        node_id="node-1",
+        initial_peers=[],
+        shared_secret="test-network-secret",
+    )
+    client = TestClient(create_app(difficulty=1, node_manager=nodes))
+    path = "/api/v1/nodes/chain"
+
+    unauthorized = client.get(path)
+    authorized = client.get(path, headers=nodes.signed_headers("GET", path))
+
+    assert unauthorized.status_code == 401
+    assert authorized.status_code == 200
+    assert authorized.json()["length"] == 1
+
+
+def test_reports_authenticated_node_network() -> None:
+    nodes = NodeManager(
+        node_id="portfolio-node",
+        node_url="http://portfolio.test",
+        initial_peers=[],
+        shared_secret="test-network-secret",
+    )
+    client = TestClient(create_app(difficulty=1, node_manager=nodes))
+
+    response = client.get("/api/v1/nodes")
+
+    assert response.status_code == 200
+    assert response.json()["authentication_enabled"] is True
+    assert response.json()["node_url"] == "http://portfolio.test"

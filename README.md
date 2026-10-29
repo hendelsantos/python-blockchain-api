@@ -21,6 +21,8 @@ concorrência básica, persistência SQL, testes automatizados, containerizaçã
 - carteiras Ed25519 geradas no navegador e transações assinadas;
 - validação de assinatura, endereço e nonce contra ataques de replay;
 - registro de peers e consenso pela cadeia válida mais longa;
+- descoberta automática de peers a partir de nós bootstrap;
+- autenticação HMAC-SHA256 nas chamadas internas entre nós;
 - atualizações de blocos em tempo real por WebSocket;
 - segundo nó isolado e opcional no Docker Compose;
 - migrações de banco com Alembic;
@@ -64,16 +66,25 @@ docker compose --profile network up --build
 ```
 
 O primeiro nó fica em `http://localhost:8000` e o segundo em
-`http://localhost:8002`, cada um com seu próprio PostgreSQL. Registre o segundo nó no
-primeiro usando `http://node2:8000`, que é o endereço interno do Docker:
+`http://localhost:8002`, cada um com seu próprio PostgreSQL. Os nós são configurados
+como peers automaticamente pelo Docker Compose e usam o mesmo segredo HMAC. Defina um
+segredo próprio antes de usar fora do ambiente local:
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/nodes/register \
-  -H "Content-Type: application/json" \
-  -d '{"urls":["http://node2:8000"]}'
+export NODE_SHARED_SECRET="uma-chave-longa-e-aleatoria"
+docker compose --profile network up --build
+```
 
+Para procurar peers anunciados e executar o consenso:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/nodes/discover
 curl -X POST http://localhost:8000/api/v1/nodes/resolve
 ```
+
+As rotas internas `/api/v1/nodes/chain` e `/api/v1/nodes/peers` exigem os
+cabeçalhos `X-Node-ID`, `X-Node-Timestamp` e `X-Node-Signature`. A assinatura usa
+HMAC-SHA256 e expira após 30 segundos para reduzir tentativas de replay.
 
 ## Como executar localmente com SQLite
 
@@ -132,7 +143,10 @@ curl http://localhost:8000/api/v1/wallets/alice/balance
 | `GET` | `/api/v1/wallets/{address}/balance` | Consulta o saldo de uma carteira |
 | `GET` | `/api/v1/nodes` | Identidade e peers do nó |
 | `POST` | `/api/v1/nodes/register` | Registra novos peers |
+| `POST` | `/api/v1/nodes/discover` | Descobre peers anunciados pela rede |
 | `POST` | `/api/v1/nodes/resolve` | Executa o consenso entre peers |
+| `GET` | `/api/v1/nodes/chain` | Compartilha a cadeia com peers autenticados |
+| `GET` | `/api/v1/nodes/peers` | Compartilha peers com nós autenticados |
 | `WS` | `/ws/blocks` | Eventos de blocos e transações em tempo real |
 
 ## Qualidade
@@ -158,7 +172,7 @@ src/blockchain_api/
 ## Próximas evoluções
 
 - importar, exportar e recuperar carteiras com segurança;
-- descoberta automática e autenticação entre peers;
+- persistência e reputação dos peers descobertos;
 - consenso tolerante a falhas bizantinas;
 - autenticação, observabilidade e deploy em nuvem.
 
